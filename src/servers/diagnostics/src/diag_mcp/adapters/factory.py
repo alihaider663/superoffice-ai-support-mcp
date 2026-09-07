@@ -1,5 +1,6 @@
 """Factory for creating Diagnostics MSSQL database engine and repository adapters."""
 
+import logging
 import urllib.parse
 from pathlib import Path
 
@@ -9,10 +10,14 @@ from sqlalchemy.pool import AsyncAdaptedQueuePool
 
 from diag_mcp.adapters.app_log_locator import WarningLogCandidateLocator
 from diag_mcp.adapters.app_log_resolver import ApplicationLogLocationResolver
+from diag_mcp.adapters.composite_log_adapter import CompositeLogSearchAdapter
+from diag_mcp.adapters.iis_log_reader import SuperOfficeIisW3cLogReader
 from diag_mcp.adapters.mssql_repository import MssqlDiagnosticRepository
 from diag_mcp.adapters.warning_log_reader import SuperOfficeWarningLogReader
-from diag_mcp.contracts.interfaces import DiagnosticRepository
+from diag_mcp.contracts.interfaces import DiagnosticRepository, LogSearchClient
 from diag_mcp.settings import DiagnosticsServerSettings
+
+logger = logging.getLogger(__name__)
 
 
 def create_diagnostic_engine(settings: DiagnosticsServerSettings) -> AsyncEngine:
@@ -107,4 +112,59 @@ def create_warning_log_reader(
         location_resolver=location_resolver,
         log_dir=log_dir,
         application_log_timezone=application_log_timezone,
+    )
+
+
+def create_iis_log_reader(
+    settings: DiagnosticsServerSettings,
+    *,
+    log_dir: Path | None = None,
+) -> SuperOfficeIisW3cLogReader:
+    """Create a configured SuperOfficeIisW3cLogReader."""
+    return SuperOfficeIisW3cLogReader(
+        settings=settings,
+        log_dir=log_dir,
+    )
+
+
+def create_composite_log_adapter(
+    settings: DiagnosticsServerSettings,
+    *,
+    iis_reader: LogSearchClient | None = None,
+    warning_reader: LogSearchClient | None = None,
+    engine: AsyncEngine | None = None,
+) -> CompositeLogSearchAdapter:
+    """Create a configured CompositeLogSearchAdapter based on server settings.
+
+    Preserves admin configuration intent (iis_enabled and warning_enabled) even if
+    individual reader initialization fails, ensuring fail-closed runtime semantics.
+    """
+    active_iis_reader = iis_reader
+    if active_iis_reader is None and settings.iis_log_enabled:
+        try:
+            active_iis_reader = create_iis_log_reader(settings)
+        except Exception as exc:
+            logger.exception("Failed to initialize IIS log reader adapter: %s", exc)
+            active_iis_reader = None
+
+    active_warning_reader = warning_reader
+    if active_warning_reader is None and settings.application_log_enabled:
+        try:
+            active_resolver = None
+            if not settings.application_log_path_override:
+                active_engine = engine or create_diagnostic_engine(settings)
+                active_resolver = create_application_log_resolver(settings, engine=active_engine)
+            active_warning_reader = create_warning_log_reader(
+                settings,
+                location_resolver=active_resolver,
+            )
+        except Exception as exc:
+            logger.exception("Failed to initialize Warning log reader adapter: %s", exc)
+            active_warning_reader = None
+
+    return CompositeLogSearchAdapter(
+        iis_reader=active_iis_reader,
+        warning_reader=active_warning_reader,
+        iis_enabled=settings.iis_log_enabled,
+        warning_enabled=settings.application_log_enabled,
     )

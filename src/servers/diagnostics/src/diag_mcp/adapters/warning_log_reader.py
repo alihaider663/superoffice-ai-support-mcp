@@ -436,7 +436,15 @@ class SuperOfficeWarningLogReader(LogSearchClient):
 
         if criteria.query_text:
             query_lower = criteria.query_text.lower()
-            if query_lower not in event.full_message.lower():
+            # Searchable fields: header message, component, method, process_name
+            # Hidden raw continuation lines / stack traces are NOT searchable (Gate 7A.4C Sec 23)
+            searchable_fields = [
+                event.header_message,
+                event.component or "",
+                event.method or "",
+                event.process_name,
+            ]
+            if not any(query_lower in field.lower() for field in searchable_fields):
                 return False
 
         return True
@@ -483,7 +491,7 @@ class SuperOfficeWarningLogReader(LogSearchClient):
             timestamp=normalized_utc,
             service_name=SERVICE_NAME,
             severity="WARN",
-            message=event.full_message,
+            message=event.header_message,
             correlation_id=None,
             ticket_id=None,
             raw_context=raw_context,

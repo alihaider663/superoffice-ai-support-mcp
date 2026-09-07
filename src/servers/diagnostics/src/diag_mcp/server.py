@@ -6,7 +6,7 @@ from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 from starlette.applications import Starlette
 
-from diag_mcp.adapters.factory import create_diagnostic_repository
+from diag_mcp.adapters.factory import create_composite_log_adapter, create_diagnostic_repository
 from diag_mcp.contracts.dtos import (
     BlockingSessionCriteriaDTO,
     DeadlockCriteriaDTO,
@@ -14,7 +14,7 @@ from diag_mcp.contracts.dtos import (
     TicketDiagnosticCriteriaDTO,
 )
 from diag_mcp.contracts.errors import DatabaseDiagnosticError, LogSearchError
-from diag_mcp.contracts.interfaces import DiagnosticRepository
+from diag_mcp.contracts.interfaces import DiagnosticRepository, LogSearchClient
 from diag_mcp.services.diagnostic_service import DiagnosticsApplicationService
 from diag_mcp.settings import DiagnosticsServerSettings
 
@@ -97,13 +97,16 @@ def create_diagnostics_mcp_server(
 
     @mcp_server.tool(
         name="search_logs",
-        description="Search application and API log entries (BLOCKED: awaiting log backend)",
+        description="Search application and API log entries",
     )
-    async def search_logs(query: str, limit: int = 20) -> dict[str, Any]:  # noqa: ARG001
-        raise LogSearchError(
-            "Log search runtime is blocked pending physical log backend specification.",
-            error_code="LOG_SEARCH_BACKEND_NOT_CONFIGURED",
-        )
+    async def search_logs(query: str, limit: int = 20) -> dict[str, Any]:
+        if app_service is None:
+            raise LogSearchError(
+                "Diagnostics log search service is not configured or unavailable.",
+                error_code="LOG_SEARCH_BACKEND_NOT_CONFIGURED",
+            )
+        res = await app_service.search_logs(query=query, limit=limit)
+        return res.model_dump(mode="json")
 
     @mcp_server.tool(
         name="find_deadlocks",
@@ -143,16 +146,18 @@ def create_app(
     settings: DiagnosticsServerSettings | None = None,
     service: DiagnosticsApplicationService | None = None,
     repository: DiagnosticRepository | None = None,
+    log_client: LogSearchClient | None = None,
 ) -> Starlette:
     """Create the Starlette ASGI application for Diagnostics MCP Server."""
     active_service = service
     if active_service is None:
-        if repository is not None:
-            active_service = DiagnosticsApplicationService(repository=repository)
-        else:
-            active_settings = settings or DiagnosticsServerSettings()
-            active_repo = create_diagnostic_repository(active_settings)
-            active_service = DiagnosticsApplicationService(repository=active_repo)
+        active_settings = settings or DiagnosticsServerSettings()
+        active_repo = repository or create_diagnostic_repository(active_settings)
+        active_log_client = log_client or create_composite_log_adapter(active_settings)
+        active_service = DiagnosticsApplicationService(
+            repository=active_repo,
+            log_client=active_log_client,
+        )
 
     server = create_diagnostics_mcp_server(service=active_service)
     return server.streamable_http_app()

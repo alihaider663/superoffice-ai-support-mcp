@@ -364,20 +364,53 @@ async def test_search_logs_time_window_filtering(sample_warning_file: Path) -> N
 
 @pytest.mark.asyncio
 async def test_search_logs_query_text_filtering(sample_warning_file: Path) -> None:
-    """Verify search_logs filters by literal query_text across message and continuations."""
+    """Verify search_logs filters by literal query_text across header fields (Section 23)."""
     reader = SuperOfficeWarningLogReader(
         log_dir=sample_warning_file.parent,
         enabled=True,
         application_log_timezone="UTC",
     )
-    criteria = LogSearchCriteriaDTO(query_text="No credential record")
+    # Header message contains "Authentication failed" -> matches
+    criteria = LogSearchCriteriaDTO(query_text="Authentication failed")
     res = await reader.search_logs(criteria)
     assert res.returned_count == 1
-    assert "No credential record matched" in res.items[0].message
+    assert "Authentication failed" in res.items[0].message
 
     criteria_none = LogSearchCriteriaDTO(query_text="NonExistentTermXYZ")
     res_none = await reader.search_logs(criteria_none)
     assert res_none.returned_count == 0
+
+
+@pytest.mark.asyncio
+async def test_warning_continuation_not_publicly_searchable(tmp_path: Path) -> None:
+    """Verify tokens in continuation lines do NOT match public query (Gate 7A.4C Sec 23 & 41)."""
+    log_file = tmp_path / "warning.2026-08-25"
+    content = (
+        "[101] [(System) ] [soap.exe ] 2026-08-25 09:00:00.000 [0.0] [0.0]: "
+        "Component::method: Safe header message\n"
+        "SECRET_CONTINUATION_TOKEN_123\n"
+        "Stack trace: at Foo.Bar() in line 42\n"
+    )
+    log_file.write_text(content, encoding="utf-8")
+
+    reader = SuperOfficeWarningLogReader(
+        log_dir=tmp_path,
+        enabled=True,
+        application_log_timezone="UTC",
+    )
+
+    # 1. Querying token only present in continuation must return 0 matches
+    res_secret = await reader.search_logs(
+        LogSearchCriteriaDTO(query_text="SECRET_CONTINUATION_TOKEN_123")
+    )
+    assert res_secret.returned_count == 0
+
+    # 2. Querying normal header message must match
+    res_header = await reader.search_logs(LogSearchCriteriaDTO(query_text="Safe header"))
+    assert res_header.returned_count == 1
+    # Verify emitted message is minimized to header only (no continuation / stack trace)
+    assert res_header.items[0].message == "Component::method: Safe header message"
+    assert "SECRET_CONTINUATION_TOKEN_123" not in res_header.items[0].message
 
 
 @pytest.mark.asyncio
