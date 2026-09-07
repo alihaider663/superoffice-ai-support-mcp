@@ -6,6 +6,8 @@ import pyodbc  # type: ignore[import-not-found]
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from sqlalchemy.pool import AsyncAdaptedQueuePool
 
+from diag_mcp.adapters.app_log_locator import WarningLogCandidateLocator
+from diag_mcp.adapters.app_log_resolver import ApplicationLogLocationResolver
 from diag_mcp.adapters.mssql_repository import MssqlDiagnosticRepository
 from diag_mcp.contracts.interfaces import DiagnosticRepository
 from diag_mcp.settings import DiagnosticsServerSettings
@@ -67,3 +69,22 @@ def create_diagnostic_repository(settings: DiagnosticsServerSettings) -> Diagnos
         query_timeout_seconds=settings.mssql_query_timeout_seconds,
         max_rows=settings.mssql_max_rows,
     )
+
+
+def create_application_log_resolver(
+    settings: DiagnosticsServerSettings,
+    *,
+    engine: AsyncEngine | None = None,
+) -> ApplicationLogLocationResolver:
+    """Create a configured ApplicationLogLocationResolver."""
+    return ApplicationLogLocationResolver(
+        settings=settings,
+        engine=engine,
+    )
+
+
+def create_warning_log_candidate_locator(
+    settings: DiagnosticsServerSettings,
+) -> WarningLogCandidateLocator:
+    """Create a configured WarningLogCandidateLocator."""
+    return WarningLogCandidateLocator(settings=settings)

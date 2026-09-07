@@ -122,5 +122,21 @@ class DiagnosticsServerSettings(BasePlatformSettings):
         description="Maximum logical W3C line size in bytes (canonical: 8 KiB / 8,192 bytes)",
     )
 
+    # SuperOffice Application / Warning Log Configuration (Gate 7A.4B1)
+    # Default is disabled. When enabled, resolves dbo.config.warning from MSSQL
+    # unless application_log_path_override is explicitly set in runtime environment.
+    application_log_enabled: bool = Field(
+        default=False,
+        description="Whether the SuperOffice application warning-log backend is enabled",
+    )
+    application_log_path_override: str | None = Field(
+        default=None,
+        description="Trusted runtime override for SuperOffice warning log path/prefix",
+    )
+    application_max_files: PositiveInt = Field(
+        default=3,
+        description="Maximum candidate warning-log files to inspect per search (canonical: 3)",
+    )
+
     security: SecuritySettings = SecuritySettings()
     logging: LoggingSettings = LoggingSettings()
