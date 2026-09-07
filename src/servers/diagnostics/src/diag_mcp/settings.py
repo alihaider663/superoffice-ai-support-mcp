@@ -137,6 +137,32 @@ class DiagnosticsServerSettings(BasePlatformSettings):
         default=3,
         description="Maximum candidate warning-log files to inspect per search (canonical: 3)",
     )
+    application_log_timezone: str | None = Field(
+        default=None,
+        description="IANA timezone of SuperOffice warning logs (unconfigured by default)",
+    )
+    application_max_scan_bytes: PositiveInt = Field(
+        default=16 * 1024 * 1024,
+        description="Maximum bytes scanned across candidate warning logs (canonical: 16 MiB)",
+    )
+    application_scan_timeout_seconds: float = Field(
+        default=5.0,
+        gt=0.0,
+        le=30.0,
+        description="Maximum wall-clock seconds for warning log scan (canonical: 5.0s)",
+    )
+    application_max_event_lines: PositiveInt = Field(
+        default=50,
+        description="Maximum physical lines allowed per multiline warning event (canonical: 50)",
+    )
+    application_max_event_bytes: PositiveInt = Field(
+        default=16 * 1024,
+        description="Maximum bytes allowed per logical warning event (canonical: 16 KiB)",
+    )
+    application_read_chunk_bytes: PositiveInt = Field(
+        default=64 * 1024,
+        description="Streaming chunk read size in bytes (canonical: 64 KiB)",
+    )
 
     security: SecuritySettings = SecuritySettings()
     logging: LoggingSettings = LoggingSettings()

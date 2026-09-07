@@ -14,15 +14,24 @@ from diag_mcp.adapters.factory import (
     create_diagnostic_engine,
     create_diagnostic_repository,
     create_warning_log_candidate_locator,
+    create_warning_log_reader,
 )
 from diag_mcp.adapters.iis_log_reader import SuperOfficeIisW3cLogReader
 from diag_mcp.adapters.mssql_repository import MssqlDiagnosticRepository
+from diag_mcp.adapters.warning_log_parser import (
+    ParsedWarningEvent,
+    SuperOfficeWarningLogParser,
+)
+from diag_mcp.adapters.warning_log_reader import SuperOfficeWarningLogReader
 
 __all__ = [
     "ApplicationLogLocationDTO",
     "ApplicationLogLocationResolver",
     "MssqlDiagnosticRepository",
+    "ParsedWarningEvent",
     "SuperOfficeIisW3cLogReader",
+    "SuperOfficeWarningLogParser",
+    "SuperOfficeWarningLogReader",
     "WarningLogCandidateBatch",
     "WarningLogCandidateLocator",
     "WarningLogCandidateMetadata",
@@ -30,4 +39,5 @@ __all__ = [
     "create_diagnostic_engine",
     "create_diagnostic_repository",
     "create_warning_log_candidate_locator",
+    "create_warning_log_reader",
 ]

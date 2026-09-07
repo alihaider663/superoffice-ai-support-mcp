@@ -1,6 +1,7 @@
 """Factory for creating Diagnostics MSSQL database engine and repository adapters."""
 
 import urllib.parse
+from pathlib import Path
 
 import pyodbc  # type: ignore[import-not-found]
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
@@ -9,6 +10,7 @@ from sqlalchemy.pool import AsyncAdaptedQueuePool
 from diag_mcp.adapters.app_log_locator import WarningLogCandidateLocator
 from diag_mcp.adapters.app_log_resolver import ApplicationLogLocationResolver
 from diag_mcp.adapters.mssql_repository import MssqlDiagnosticRepository
+from diag_mcp.adapters.warning_log_reader import SuperOfficeWarningLogReader
 from diag_mcp.contracts.interfaces import DiagnosticRepository
 from diag_mcp.settings import DiagnosticsServerSettings
 
@@ -88,3 +90,21 @@ def create_warning_log_candidate_locator(
 ) -> WarningLogCandidateLocator:
     """Create a configured WarningLogCandidateLocator."""
     return WarningLogCandidateLocator(settings=settings)
+
+
+def create_warning_log_reader(
+    settings: DiagnosticsServerSettings,
+    *,
+    locator: WarningLogCandidateLocator | None = None,
+    location_resolver: ApplicationLogLocationResolver | None = None,
+    log_dir: Path | None = None,
+    application_log_timezone: str | None = None,
+) -> SuperOfficeWarningLogReader:
+    """Create a configured SuperOfficeWarningLogReader."""
+    return SuperOfficeWarningLogReader(
+        settings=settings,
+        locator=locator,
+        location_resolver=location_resolver,
+        log_dir=log_dir,
+        application_log_timezone=application_log_timezone,
+    )
