@@ -10,6 +10,7 @@ from kb_mcp.contracts.dtos import (
     KnowledgeSearchCriteriaDTO,
     KnownIssueSearchCriteriaDTO,
 )
+from kb_mcp.contracts.errors import KnowledgeBackendNotConfiguredError
 from kb_mcp.contracts.interfaces import KnowledgeRepository
 from kb_mcp.services.knowledge_service import KnowledgeApplicationService
 from kb_mcp.settings import KnowledgeServerSettings
@@ -55,12 +56,7 @@ def create_knowledge_mcp_server(
     )
     async def search_knowledge(query_text: str, max_results: int = 5) -> list[dict[str, Any]]:
         if app_service is None:
-            return [
-                {
-                    "title": "Knowledge Entry",
-                    "content_excerpt": f"Search result for {query_text}",
-                }
-            ]
+            raise KnowledgeBackendNotConfiguredError("Knowledge backend is not configured.")
         criteria = KnowledgeSearchCriteriaDTO(query_text=query_text, limit=max_results)
         chunks = await app_service.search_knowledge(criteria)
         return [c.model_dump(mode="json") for c in chunks]
@@ -68,14 +64,14 @@ def create_knowledge_mcp_server(
     @mcp_server.tool(name="get_runbook", description="Retrieve specific runbook by ID")
     async def get_runbook(runbook_id: str) -> dict[str, Any]:
         if app_service is None:
-            return {"runbook_id": runbook_id, "title": f"Runbook {runbook_id}"}
+            raise KnowledgeBackendNotConfiguredError("Knowledge backend is not configured.")
         rb = await app_service.get_runbook(runbook_id)
         return rb.model_dump(mode="json")
 
     @mcp_server.tool(name="find_known_issues", description="Find matching known issue articles")
     async def find_known_issues(query_text: str, max_results: int = 5) -> list[dict[str, Any]]:
         if app_service is None:
-            return [{"issue_id": "ISSUE-01", "title": f"Known issue for {query_text}"}]
+            raise KnowledgeBackendNotConfiguredError("Knowledge backend is not configured.")
         criteria = KnownIssueSearchCriteriaDTO(query_text=query_text, limit=max_results)
         issues = await app_service.find_known_issues(criteria)
         return [i.model_dump(mode="json") for i in issues]
@@ -86,7 +82,8 @@ def create_knowledge_mcp_server(
 def create_app(
     settings: KnowledgeServerSettings | None = None,  # noqa: ARG001
     service: KnowledgeApplicationService | None = None,
+    repository: KnowledgeRepository | None = None,
 ) -> Starlette:
     """Create the Starlette ASGI application for Knowledge MCP Server."""
-    server = create_knowledge_mcp_server(service=service)
+    server = create_knowledge_mcp_server(service=service, repository=repository)
     return server.streamable_http_app()

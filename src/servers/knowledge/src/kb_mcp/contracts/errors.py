@@ -34,3 +34,19 @@ class RunbookNotFoundError(ResourceNotFoundError):
             resource_type="Runbook",
             identifier=runbook_id,
         )
+
+
+class KnowledgeBackendNotConfiguredError(KnowledgeSearchError):
+    """Raised when a Knowledge MCP tool is invoked but the backend service is not configured."""
+
+    def __init__(
+        self,
+        message: str = "Knowledge backend is not configured.",
+        *,
+        details: dict[str, Any] | None = None,
+    ) -> None:
+        super().__init__(
+            message=message,
+            error_code="KNOWLEDGE_BACKEND_NOT_CONFIGURED",
+            details=details,
+        )

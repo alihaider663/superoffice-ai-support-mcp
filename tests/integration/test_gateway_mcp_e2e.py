@@ -35,6 +35,7 @@ from so_mcp.contracts.dtos import TicketDetailDomainDTO
 from so_mcp.server import create_app as create_so_app
 from so_mcp.server import create_superoffice_mcp_server
 from tests.fakes.fake_diagnostic_repository import FakeDiagnosticRepository
+from tests.fakes.fake_knowledge_repository import FakeKnowledgeRepository
 from tests.fakes.fake_superoffice_client import FakeSuperOfficeClient
 
 TEST_JWT_SECRET = "super-secret-e2e-signing-key-32bytes-long"
@@ -120,7 +121,7 @@ def e2e_gateway_client() -> TestClient:
     )
     so_server = create_superoffice_mcp_server(client=fake_so_client)
     diag_server = create_diagnostics_mcp_server(repository=FakeDiagnosticRepository())
-    kb_server = create_knowledge_mcp_server()
+    kb_server = create_knowledge_mcp_server(repository=FakeKnowledgeRepository())
     infra_server = create_infrastructure_mcp_server()
 
     servers = {

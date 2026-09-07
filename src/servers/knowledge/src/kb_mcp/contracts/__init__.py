@@ -11,6 +11,7 @@ from kb_mcp.contracts.dtos import (
     RunbookDetailDomainDTO,
 )
 from kb_mcp.contracts.errors import (
+    KnowledgeBackendNotConfiguredError,
     KnowledgeSearchError,
     RunbookNotFoundError,
 )
@@ -19,6 +20,7 @@ from kb_mcp.contracts.interfaces import (
 )
 
 __all__ = [
+    "KnowledgeBackendNotConfiguredError",
     "KnowledgeRepository",
     "KnowledgeSearchCriteriaDTO",
     "KnowledgeSearchError",
