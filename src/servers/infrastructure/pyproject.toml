@@ -1,0 +1,20 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "infra-mcp"
+version = "0.1.0"
+description = "SuperOffice Host and Infrastructure Diagnostics MCP Server"
+requires-python = ">=3.12"
+dependencies = [
+    "platform-core",
+    "platform-config",
+    "platform-security",
+    "platform-observability",
+    "platform-investigation",
+    "mcp>=1.3.0,<2.0.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/infra_mcp"]

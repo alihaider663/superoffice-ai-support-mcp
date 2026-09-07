@@ -1,0 +1,17 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "platform-observability"
+version = "0.1.0"
+description = "Structured logging, correlation IDs, and audit logging framework"
+requires-python = ">=3.12"
+dependencies = [
+    "platform-core",
+    "platform-config",
+    "structlog>=24.4.0,<25.0.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/platform_observability"]

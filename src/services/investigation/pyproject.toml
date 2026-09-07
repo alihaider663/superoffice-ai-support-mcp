@@ -1,0 +1,17 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "platform-investigation-service"
+version = "0.1.0"
+description = "Layer-4 investigation application service composing domain backends with generic investigation runtimes"
+requires-python = ">=3.12"
+dependencies = [
+    "platform-core",
+    "platform-observability",
+    "platform-investigation",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/platform_investigation_service"]

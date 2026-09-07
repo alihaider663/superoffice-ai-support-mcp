@@ -1,0 +1,16 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "platform-investigation"
+version = "0.1.0"
+description = "Evidence aggregation, investigation orchestration, and incident correlation framework"
+requires-python = ">=3.12"
+dependencies = [
+    "platform-core",
+    "platform-observability",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/platform_investigation"]

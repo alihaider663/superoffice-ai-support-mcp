@@ -1,0 +1,18 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "platform-security"
+version = "0.1.0"
+description = "Security, RBAC, PII filtering, and authorization interfaces"
+requires-python = ">=3.12"
+dependencies = [
+    "platform-core",
+    "platform-config",
+    "pyjwt[crypto]>=2.10.0,<3.0.0",
+    "pyyaml>=6.0.2,<7.0.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/platform_security"]

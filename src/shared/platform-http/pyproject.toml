@@ -1,0 +1,18 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "platform-http"
+version = "0.1.0"
+description = "Resilient asynchronous HTTP client abstractions and policies"
+requires-python = ">=3.12"
+dependencies = [
+    "platform-core",
+    "platform-config",
+    "platform-observability",
+    "httpx>=0.28.0,<1.0.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/platform_http"]

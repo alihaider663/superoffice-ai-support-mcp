@@ -1,0 +1,16 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "platform-config"
+version = "0.1.0"
+description = "Typed configuration models using Pydantic Settings"
+requires-python = ">=3.12"
+dependencies = [
+    "platform-core",
+    "pydantic-settings>=2.7.0,<3.0.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/platform_config"]

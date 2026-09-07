@@ -1,0 +1,91 @@
+# Python
+
+**pycache**/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environments
+
+.venv/
+venv/
+env/
+
+# Environment / secrets
+
+.env
+.env.*
+!.env.example
+
+# IDE
+
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Testing
+
+.pytest_cache/
+.coverage
+htmlcov/
+.coverage.*
+
+# Type checking
+
+.mypy_cache/
+.pyright/
+
+# Linting
+
+.ruff_cache/
+
+# Build
+
+build/
+dist/
+*.egg-info/
+
+# OS
+
+.DS_Store
+Thumbs.db
+
+# Logs
+
+*.log
+logs/
+
+# Temporary files
+
+tmp/
+temp/
+
+# Local databases
+
+*.db
+*.sqlite
+*.sqlite3
+
+# Customer / production data
+
+customer-data/
+production-data/
+production-logs/
+attachments/
+exports/
+backups/
+
+# Certificates and keys
+
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
+# Generated artifacts
+
+artifacts/
+
+

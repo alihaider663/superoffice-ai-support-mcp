@@ -1,0 +1,143 @@
+version: "1.0"
+roles_hierarchy:
+  L1: 1
+  L2: 2
+  L3: 3
+
+tools:
+  # Knowledge MCP (L1)
+  search_knowledge:
+    minimum_role: L1
+    classification: READ_ONLY
+    data_level: INTERNAL
+    description: "Search sanitized knowledge base and runbooks"
+  get_runbook:
+    minimum_role: L1
+    classification: READ_ONLY
+    data_level: INTERNAL
+    description: "Retrieve specific runbook by ID"
+  find_known_issues:
+    minimum_role: L1
+    classification: READ_ONLY
+    data_level: INTERNAL
+    description: "Find matching known issue articles"
+
+  # SuperOffice MCP (L1)
+  get_ticket:
+    minimum_role: L1
+    classification: READ_ONLY
+    data_level: CONFIDENTIAL
+    description: "Get basic ticket summary and status"
+  search_tickets:
+    minimum_role: L1
+    classification: READ_ONLY
+    data_level: CONFIDENTIAL
+    description: "Search tickets by title, category, or status"
+  get_ticket_messages:
+    minimum_role: L1
+    classification: READ_ONLY
+    data_level: CONFIDENTIAL
+    description: "Get ticket message history"
+  list_attachments:
+    minimum_role: L1
+    classification: READ_ONLY
+    data_level: CONFIDENTIAL
+    description: "List attachment metadata without raw content"
+
+  # SuperOffice MCP (L2)
+  get_company:
+    minimum_role: L2
+    classification: READ_ONLY
+    data_level: RESTRICTED
+    description: "Retrieve customer company details"
+  find_companies:
+    minimum_role: L2
+    classification: READ_ONLY
+    data_level: RESTRICTED
+    description: "Find companies matching criteria"
+  get_person:
+    minimum_role: L2
+    classification: READ_ONLY
+    data_level: RESTRICTED
+    description: "Retrieve customer contact person details"
+  find_persons:
+    minimum_role: L2
+    classification: READ_ONLY
+    data_level: RESTRICTED
+    description: "Find contact persons matching criteria"
+  update_ticket_status:
+    minimum_role: L2
+    classification: SENSITIVE_WRITE
+    data_level: CONFIDENTIAL
+    requires:
+      - production_write
+    description: "Update ticket status in SuperOffice CRM"
+  add_ticket_comment:
+    minimum_role: L2
+    classification: SAFE_WRITE
+    data_level: CONFIDENTIAL
+    requires:
+      - production_write
+    description: "Post a comment or response to a ticket"
+
+  # Diagnostics MCP (L2)
+  get_database_health:
+    minimum_role: L2
+    classification: READ_ONLY
+    data_level: INTERNAL
+    description: "Basic database cluster health diagnostics"
+  find_slow_queries:
+    minimum_role: L2
+    classification: READ_ONLY
+    data_level: INTERNAL
+    description: "Inspect slow query execution records"
+  get_ticket_diagnostic_record:
+    minimum_role: L2
+    classification: READ_ONLY
+    data_level: CONFIDENTIAL
+    description: "Get diagnostic database records for a ticket"
+  search_logs:
+    minimum_role: L2
+    classification: READ_ONLY
+    data_level: CONFIDENTIAL
+    description: "Search application and API log entries"
+
+  # Diagnostics MCP (L3)
+  find_deadlocks:
+    minimum_role: L3
+    classification: READ_ONLY
+    data_level: INTERNAL
+    description: "Analyze SQL Server deadlock graphs and events"
+  find_blocking_sessions:
+    minimum_role: L3
+    classification: READ_ONLY
+    data_level: INTERNAL
+    description: "Analyze SQL Server blocking transactions"
+
+  # SuperOffice Attachment Content (L3 + Special Flag)
+  get_attachment_content:
+    minimum_role: L3
+    classification: READ_ONLY
+    data_level: RESTRICTED
+    requires:
+      - attachment_access
+    description: "Download or extract text from raw attachment content"
+
+  # Infrastructure MCP (L3)
+  get_host_metrics:
+    minimum_role: L3
+    classification: READ_ONLY
+    data_level: INTERNAL
+    description: "Get host CPU, memory, and disk utilization"
+  get_iis_app_pool_status:
+    minimum_role: L3
+    classification: READ_ONLY
+    data_level: INTERNAL
+    description: "Get IIS Application Pool operational health status"
+
+  # Investigation MCP (L3 Composite Investigation)
+  investigate_incident:
+    minimum_role: L3
+    classification: READ_ONLY
+    data_level: CONFIDENTIAL
+    description: "Orchestrate structured, cross-domain diagnostic investigation of a platform incident"
