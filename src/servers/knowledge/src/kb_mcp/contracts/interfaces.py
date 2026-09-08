@@ -17,7 +17,9 @@ class KnowledgeRepository(Protocol):
     """Protocol for Supabase / pgvector semantic knowledge retrieval repository."""
 
     async def search_knowledge(
-        self, criteria: KnowledgeSearchCriteriaDTO
+        self,
+        criteria: KnowledgeSearchCriteriaDTO,
+        query_embedding: Sequence[float],
     ) -> tuple[KnowledgeSearchResultDomainDTO, ...]:
         """Perform semantic search across approved product and troubleshooting documentation.
 

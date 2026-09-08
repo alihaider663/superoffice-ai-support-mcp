@@ -6,22 +6,39 @@ from platform_core.errors import IntegrationError, PlatformError, ResourceNotFou
 
 
 class KnowledgeSearchError(IntegrationError):
-    """Raised when an error occurs during Supabase vector or full-text knowledge retrieval.
+    """Raised when an error occurs during vector or full-text knowledge retrieval.
 
-    Ensures Supabase URLs, PostgreSQL schemas, and backend vector parameters are not leaked.
+    Ensures connection URLs, PostgreSQL schemas, and backend vector parameters are not leaked.
     """
 
     def __init__(
         self,
         message: str,
         *,
+        system_name: str = "KnowledgeStore",
         error_code: str = "KNOWLEDGE_SEARCH_ERROR",
         details: dict[str, Any] | None = None,
     ) -> None:
         super().__init__(
             message=message,
-            system_name="SupabaseKnowledgeStore",
+            system_name=system_name,
             error_code=error_code,
+            details=details,
+        )
+
+
+class MalformedRunbookDataError(KnowledgeSearchError):
+    """Raised when runbook step data (JSONB) in the database is malformed or invalid."""
+
+    def __init__(
+        self,
+        message: str = "Runbook contains malformed diagnostic or remediation step data.",
+        *,
+        details: dict[str, Any] | None = None,
+    ) -> None:
+        super().__init__(
+            message=message,
+            error_code="MALFORMED_RUNBOOK_DATA",
             details=details,
         )
 

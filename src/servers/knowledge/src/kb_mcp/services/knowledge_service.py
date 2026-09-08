@@ -7,7 +7,8 @@ from kb_mcp.contracts.dtos import (
     MinimizedKnownIssueDTO,
     MinimizedRunbookDTO,
 )
-from kb_mcp.contracts.interfaces import KnowledgeRepository
+from kb_mcp.contracts.errors import KnowledgeSearchError
+from kb_mcp.contracts.interfaces import EmbeddingProvider, KnowledgeRepository
 from platform_security.sanitization import RecursiveOutputSanitizer
 
 
@@ -18,9 +19,11 @@ class KnowledgeApplicationService:
         self,
         repository: KnowledgeRepository,
         sanitizer: RecursiveOutputSanitizer | None = None,
+        embedding_provider: EmbeddingProvider | None = None,
     ) -> None:
         self._repository = repository
         self._sanitizer = sanitizer or RecursiveOutputSanitizer()
+        self._embedding_provider = embedding_provider
 
     def _sanitize_string(self, text: str | None) -> str:
         """Sanitize a free-text string using RecursiveOutputSanitizer."""
@@ -33,7 +36,17 @@ class KnowledgeApplicationService:
         self, criteria: KnowledgeSearchCriteriaDTO
     ) -> tuple[MinimizedKnowledgeChunkDTO, ...]:
         """Perform semantic search across knowledge base and project AI-safe minimized chunks."""
-        domain_results = await self._repository.search_knowledge(criteria)
+        if self._embedding_provider is not None:
+            query_embedding = await self._embedding_provider.embed_query(criteria.query_text)
+            domain_results = await self._repository.search_knowledge(criteria, query_embedding)
+        else:
+            try:
+                domain_results = await self._repository.search_knowledge(criteria)  # type: ignore[call-arg]
+            except TypeError as err:
+                raise KnowledgeSearchError(
+                    message="Embedding provider is required for semantic knowledge search.",
+                    error_code="EMBEDDING_PROVIDER_REQUIRED",
+                ) from err
 
         minimized_chunks: list[MinimizedKnowledgeChunkDTO] = []
         for doc in domain_results:

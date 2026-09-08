@@ -1,5 +1,7 @@
 """Deterministic in-memory FakeKnowledgeRepository for offline contract testing."""
 
+from collections.abc import Sequence
+
 from kb_mcp.contracts.dtos import (
     KnowledgeSearchCriteriaDTO,
     KnowledgeSearchResultDomainDTO,
@@ -21,6 +23,7 @@ class FakeKnowledgeRepository:
         self._runbooks: dict[str, RunbookDetailDomainDTO] = {}
         self._known_issues: list[KnownIssueDomainDTO] = []
         self._should_fail: bool = False
+        self.last_query_embedding: Sequence[float] | None = None
 
     # Seed helpers for test setup
     def seed_document(self, doc: KnowledgeSearchResultDomainDTO) -> None:
@@ -41,9 +44,12 @@ class FakeKnowledgeRepository:
 
     # Protocol implementation
     async def search_knowledge(
-        self, criteria: KnowledgeSearchCriteriaDTO
+        self,
+        criteria: KnowledgeSearchCriteriaDTO,
+        query_embedding: Sequence[float] | None = None,
     ) -> tuple[KnowledgeSearchResultDomainDTO, ...]:
         """Search knowledge documents with in-memory filtering and deterministic ranking."""
+        self.last_query_embedding = query_embedding
         if self._should_fail:
             raise KnowledgeSearchError("Simulated knowledge store query failure.")
 

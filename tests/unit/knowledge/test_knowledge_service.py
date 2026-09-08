@@ -1,5 +1,6 @@
 """Unit tests for KnowledgeApplicationService minimization and PII redaction."""
 
+from collections.abc import Sequence
 from datetime import UTC, datetime
 
 import pytest
@@ -15,6 +16,7 @@ from kb_mcp.contracts.dtos import (
     RunbookDetailDomainDTO,
 )
 from kb_mcp.contracts.errors import (
+    EmbeddingInferenceError,
     KnowledgeSearchError,
     RunbookNotFoundError,
 )
@@ -236,3 +238,52 @@ async def test_service_custom_sanitizer_injection(fake_repo: FakeKnowledgeReposi
     service = KnowledgeApplicationService(repository=fake_repo, sanitizer=custom_sanitizer)
     assert service._sanitize_string("") == ""
     assert service._sanitize_string(None) == ""
+
+
+class MockEmbeddingProvider:
+    def __init__(self, vector: tuple[float, ...], should_fail: bool = False) -> None:
+        self.vector = vector
+        self.should_fail = should_fail
+        self.embedded_texts: list[str] = []
+
+    async def embed_query(self, text: str) -> tuple[float, ...]:
+        self.embedded_texts.append(text)
+        if self.should_fail:
+            raise EmbeddingInferenceError("Simulated embedding inference failure.")
+        return self.vector
+
+    async def embed_documents(self, texts: Sequence[str]) -> tuple[tuple[float, ...], ...]:
+        return tuple(self.vector for _ in texts)
+
+
+@pytest.mark.asyncio
+async def test_service_with_embedding_provider_passes_vector_to_repository(
+    fake_repo: FakeKnowledgeRepository,
+) -> None:
+    """When embedding_provider is configured, service embeds query and forwards identical vector."""
+    test_vec = (1.0,) + (0.0,) * 383
+    provider = MockEmbeddingProvider(test_vec)
+    service = KnowledgeApplicationService(repository=fake_repo, embedding_provider=provider)
+
+    results = await service.search_knowledge(
+        KnowledgeSearchCriteriaDTO(query_text="SuperOffice SSO")
+    )
+    assert len(results) == 1
+    assert provider.embedded_texts == ["SuperOffice SSO"]
+    assert fake_repo.last_query_embedding == test_vec
+
+
+@pytest.mark.asyncio
+async def test_service_embedding_provider_failure_prevents_repository_search(
+    fake_repo: FakeKnowledgeRepository,
+) -> None:
+    """Embedding provider failure fails closed and prevents repository search execution."""
+    test_vec = (1.0,) + (0.0,) * 383
+    provider = MockEmbeddingProvider(test_vec, should_fail=True)
+    service = KnowledgeApplicationService(repository=fake_repo, embedding_provider=provider)
+
+    with pytest.raises(EmbeddingInferenceError) as exc_info:
+        await service.search_knowledge(KnowledgeSearchCriteriaDTO(query_text="SuperOffice SSO"))
+
+    assert exc_info.value.error_code == "EMBEDDING_INFERENCE_ERROR"
+    assert fake_repo.last_query_embedding is None

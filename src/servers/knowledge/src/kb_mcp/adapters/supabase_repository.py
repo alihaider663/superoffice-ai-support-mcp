@@ -2,6 +2,7 @@
 
 import re
 import urllib.parse
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Any
 
@@ -212,7 +213,9 @@ class SupabaseKnowledgeRepository(KnowledgeRepository):
         }
 
     async def search_knowledge(
-        self, criteria: KnowledgeSearchCriteriaDTO
+        self,
+        criteria: KnowledgeSearchCriteriaDTO,
+        query_embedding: Sequence[float] | None = None,
     ) -> tuple[KnowledgeSearchResultDomainDTO, ...]:
         """Perform semantic search across knowledge documentation."""
         if not self._http_client:
@@ -237,6 +240,8 @@ class SupabaseKnowledgeRepository(KnowledgeRepository):
             "query_text": criteria.query_text,
             "match_count": effective_limit,
         }
+        if query_embedding is not None:
+            payload["query_embedding"] = list(query_embedding)
         if criteria.category:
             payload["filter_category"] = criteria.category
         if criteria.product:

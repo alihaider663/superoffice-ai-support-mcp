@@ -22,6 +22,7 @@ from kb_mcp.contracts.errors import (
     EmbeddingModelInitializationError,
     KnowledgeBackendNotConfiguredError,
     KnowledgeSearchError,
+    MalformedRunbookDataError,
     RunbookNotFoundError,
 )
 from kb_mcp.contracts.interfaces import (
@@ -45,6 +46,7 @@ __all__ = [
     "KnowledgeSearchResultDomainDTO",
     "KnownIssueDomainDTO",
     "KnownIssueSearchCriteriaDTO",
+    "MalformedRunbookDataError",
     "MinimizedKnowledgeChunkDTO",
     "MinimizedKnownIssueDTO",
     "MinimizedRunbookDTO",
