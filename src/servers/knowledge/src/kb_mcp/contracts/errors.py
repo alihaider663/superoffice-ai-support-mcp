@@ -149,3 +149,22 @@ class EmbeddingDimensionError(EmbeddingError):
             error_code="EMBEDDING_DIMENSION_ERROR",
             details=merged,
         )
+
+
+class KnowledgeRuntimeInitializationError(IntegrationError):
+    """Raised when the Knowledge runtime environment is configured but fails to initialize."""
+
+    def __init__(
+        self,
+        message: str = "Failed to initialize configured Knowledge runtime backend.",
+        *,
+        system_name: str = "KnowledgeRuntime",
+        error_code: str = "KNOWLEDGE_RUNTIME_INIT_ERROR",
+        details: dict[str, Any] | None = None,
+    ) -> None:
+        super().__init__(
+            message=message,
+            system_name=system_name,
+            error_code=error_code,
+            details=details,
+        )
