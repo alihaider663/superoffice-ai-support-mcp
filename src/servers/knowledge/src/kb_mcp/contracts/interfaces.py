@@ -1,5 +1,6 @@
-"""Protocol interfaces for Knowledge repository and retrieval boundaries."""
+"""Protocol interfaces for Knowledge repository, retrieval, and embedding boundaries."""
 
+from collections.abc import Sequence
 from typing import Protocol, runtime_checkable
 
 from kb_mcp.contracts.dtos import (
@@ -41,5 +42,44 @@ class KnowledgeRepository(Protocol):
 
         Raises:
             KnowledgeSearchError: If knowledge store lookup fails.
+        """
+        ...
+
+
+@runtime_checkable
+class EmbeddingProvider(Protocol):
+    """Protocol for asynchronous text embedding generation."""
+
+    async def embed_query(self, text: str) -> tuple[float, ...]:
+        """Generate a dense vector embedding for a search query string.
+
+        Args:
+            text: Non-empty search query string.
+
+        Returns:
+            Tuple of floats representing the dense vector embedding (length 384).
+
+        Raises:
+            EmbeddingInputError: If query text is empty, whitespace-only, or invalid.
+            EmbeddingInferenceError: If inference fails or produces non-finite values.
+            EmbeddingDimensionError: If embedding dimension does not match 384.
+        """
+        ...
+
+    async def embed_documents(self, texts: Sequence[str]) -> tuple[tuple[float, ...], ...]:
+        """Generate dense vector embeddings for a sequence of document/chunk texts.
+
+        Preserves input ordering. Empty input sequence returns ().
+
+        Args:
+            texts: Sequence of non-empty document strings.
+
+        Returns:
+            Tuple of embedding tuples, each of length 384.
+
+        Raises:
+            EmbeddingInputError: If any document is empty, whitespace-only, or invalid.
+            EmbeddingInferenceError: If inference fails or count does not match.
+            EmbeddingDimensionError: If any embedding dimension does not match 384.
         """
         ...

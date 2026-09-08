@@ -1,5 +1,9 @@
-"""Knowledge contract definitions, DTOs, errors, and protocol interfaces."""
+"""Knowledge contract definitions, DTOs, errors, constants, and protocol interfaces."""
 
+from kb_mcp.contracts.constants import (
+    DEFAULT_EMBEDDING_MODEL,
+    EMBEDDING_DIMENSION,
+)
 from kb_mcp.contracts.dtos import (
     KnowledgeSearchCriteriaDTO,
     KnowledgeSearchResultDomainDTO,
@@ -11,15 +15,29 @@ from kb_mcp.contracts.dtos import (
     RunbookDetailDomainDTO,
 )
 from kb_mcp.contracts.errors import (
+    EmbeddingDimensionError,
+    EmbeddingError,
+    EmbeddingInferenceError,
+    EmbeddingInputError,
+    EmbeddingModelInitializationError,
     KnowledgeBackendNotConfiguredError,
     KnowledgeSearchError,
     RunbookNotFoundError,
 )
 from kb_mcp.contracts.interfaces import (
+    EmbeddingProvider,
     KnowledgeRepository,
 )
 
 __all__ = [
+    "DEFAULT_EMBEDDING_MODEL",
+    "EMBEDDING_DIMENSION",
+    "EmbeddingDimensionError",
+    "EmbeddingError",
+    "EmbeddingInferenceError",
+    "EmbeddingInputError",
+    "EmbeddingModelInitializationError",
+    "EmbeddingProvider",
     "KnowledgeBackendNotConfiguredError",
     "KnowledgeRepository",
     "KnowledgeSearchCriteriaDTO",

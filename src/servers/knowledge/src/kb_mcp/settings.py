@@ -1,8 +1,9 @@
 """Knowledge Base MCP Server configuration."""
 
-from pydantic import Field, HttpUrl, PositiveInt, SecretStr
+from pydantic import Field, HttpUrl, PositiveInt, SecretStr, field_validator
 from pydantic_settings import SettingsConfigDict
 
+from kb_mcp.contracts.constants import DEFAULT_EMBEDDING_MODEL
 from platform_config.base import BasePlatformSettings
 from platform_config.logging import LoggingSettings
 from platform_config.security import SecuritySettings
@@ -51,6 +52,25 @@ class KnowledgeServerSettings(BasePlatformSettings):
         le=50,
         description="Default top-K documentation chunks returned per query",
     )
+
+    embedding_model: str = Field(
+        default=DEFAULT_EMBEDDING_MODEL,
+        description="Approved local embedding model identifier",
+    )
+    embedding_cache_dir: str | None = Field(
+        default=None,
+        description="Optional custom directory for FastEmbed cached model artifacts",
+    )
+
+    @field_validator("embedding_model")
+    @classmethod
+    def validate_embedding_model(cls, v: str) -> str:
+        if v != DEFAULT_EMBEDDING_MODEL:
+            raise ValueError(
+                f"Embedding model '{v}' is not supported. "
+                f"Only approved model '{DEFAULT_EMBEDDING_MODEL}' is allowed."
+            )
+        return v
 
     security: SecuritySettings = SecuritySettings()
     logging: LoggingSettings = LoggingSettings()
