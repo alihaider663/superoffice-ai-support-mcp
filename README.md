@@ -1,19 +1,31 @@
 # SuperOffice AI Support MCP Platform
 
-[![Python](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
-[![MCP](https://img.shields.io/badge/MCP-Official%20SDK-orange.svg)](https://modelcontextprotocol.io/)
+[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
+[![MCP Official SDK](https://img.shields.io/badge/MCP-Official%20SDK-orange.svg)](https://modelcontextprotocol.io/)
 [![Status](https://img.shields.io/badge/Status-Local%20Development%20Release%201.0-brightgreen.svg)]()
-[![Regression](https://img.shields.io/badge/Tests-1043%20Passed-success.svg)]()
+[![Regression Tests](https://img.shields.io/badge/Tests-1043%20Passed-success.svg)]()
+[![License](https://img.shields.io/badge/License-Pending%20Confirmation-lightgrey.svg)]()
 
-An enterprise-grade, secure, modular Model Context Protocol (MCP) platform for AI-assisted SuperOffice CRM L1/L2/L3 support triage and cross-system incident investigation.
+An enterprise-grade, secure, modular Model Context Protocol (MCP) platform for AI-assisted SuperOffice CRM support triage, diagnostic telemetry, and cross-system incident investigation.
 
-The platform bridges LLM reasoning engines (such as Claude Desktop, Cursor, Antigravity, and autonomous support agents) with Onsite SuperOffice CRM REST APIs, Microsoft SQL Server database diagnostics, PostgreSQL/pgvector knowledge stores, and infrastructure diagnostic boundaries under strict security, data minimization, and audit controls.
+The platform bridges external LLM reasoning engines (such as Claude Desktop, Cursor, and autonomous support agents) with Onsite SuperOffice CRM REST APIs, Microsoft SQL Server database diagnostics, PostgreSQL/pgvector knowledge stores, and infrastructure boundaries under strict security, data minimization, and audit controls.
+
+> [!WARNING]
+> **Production Boundary Disclaimer**
+> 
+> **Current Release:** `v1.0.0-local.1` (Local Development Release 1.0) — **COMPLETE / APPROVED**.  
+> **Production Ready:** **NO**.  
+> **Repository Professionalization:** IN PROGRESS (FLC.5B).  
+> **Remote Publication:** NOT YET PERFORMED.  
+> **Production Readiness Program:** FUTURE / NOT STARTED.  
+> 
+> This platform is verified strictly for **local development, offline testing, and architecture validation**. It does **not** claim live production deployment, production network trust, high availability, disaster recovery, or integration with enterprise secret managers.
 
 ---
 
 ## Architecture Overview
 
-The platform strictly implements a **Six-Layer Architecture** where **Observability** is a cross-cutting concern spanning all operational layers:
+The platform strictly implements a **Six-Layer Architecture**. **Observability** is a cross-cutting concern spanning all operational layers:
 
 ```text
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -54,7 +66,8 @@ The platform strictly implements a **Six-Layer Architecture** where **Observabil
 ```
 
 ### Backend Ownership & Isolation Boundaries
-Each data source is exclusively owned by a single service boundary. External AI models and LLMs have **zero direct access** to databases, filesystems, attachments, infrastructure, shells, or enterprise credentials:
+
+Each backend is exclusively owned by a single service boundary. External AI models and LLMs have **zero direct access** to databases, filesystems, attachments, infrastructure shells, or enterprise credentials:
 - **SuperOffice Business Data** $\rightarrow$ SuperOffice MCP (`so-mcp`) $\rightarrow$ SuperOffice REST API.
 - **MSSQL Database Diagnostics & Logs** $\rightarrow$ Diagnostics MCP (`diag-mcp`) $\rightarrow$ Microsoft SQL Server & Log parsers.
 - **Technical Knowledge & Runbooks** $\rightarrow$ Knowledge MCP (`kb-mcp`) $\rightarrow$ PostgreSQL + `pgvector`.
@@ -65,7 +78,7 @@ Each data source is exclusively owned by a single service boundary. External AI 
 
 ## Canonical Public Tool Inventory (18 Tools)
 
-The Gateway exposes exactly **18 registered public tools** over Streamable HTTP (ADR 007). There are zero aliases and zero public ingestion tools.
+The Gateway exposes exactly **18 registered public tools** over Streamable HTTP ([ADR 007](docs/adr/007-gateway-protocol-selection.md)). There are zero aliases and zero public ingestion tools.
 
 | Server | Tool Name | Minimum Role | Classification | Data Level | Description |
 | :--- | :--- | :---: | :---: | :---: | :--- |
@@ -100,7 +113,7 @@ The Gateway exposes exactly **18 registered public tools** over Streamable HTTP 
 ## Security Model & Policy Invariants
 
 - **Deny-by-Default RBAC**: Declarative tool-level policy defined in `tool_permissions.yaml` and enforced by `YamlPolicyEngine`. Unknown roles or unmapped tools are unconditionally rejected (`DENY`).
-- **Role Hierarchy**: `L1` (Basic Triage) $\subset$ `L2` (Diagnostics) $\subset$ `L3` (Cross-System Investigation).
+- **Role Hierarchy**: `L1` (Basic Support Triage) $\subset$ `L2` (Diagnostics) $\subset$ `L3` (Cross-System Investigation).
 - **Attachment Protection (Decision D05)**: Deny-by-default. The public tool `list_attachments` returns strictly metadata. Raw attachment downloads and automatic ingestion to AI models are prohibited.
 - **External AI Boundary (Decision D08)**: Live production transmission of confidential/sensitive SuperOffice CRM data to external AI endpoints is **NOT APPROVED**. Knowledge ingestion of live customer CRM exports is **DENIED**.
 - **Database Safety (Decisions D01, D02, D09)**:
@@ -117,23 +130,57 @@ The Gateway exposes exactly **18 registered public tools** over Streamable HTTP 
 - **Embeddings**: In-process `FastEmbedEmbeddingProvider` utilizing `BAAI/bge-small-en-v1.5` (384 dimensions).
 - **Immutable Artifacts**: Pre-redacted canonical Markdown artifacts stored at `approved/<type>/<id>/<hash>.md` on local filesystem outside Git.
 - **Concurrency Control**: Transaction-scoped PostgreSQL advisory locking (`pg_advisory_xact_lock`) serializes ingest per document while computing embeddings outside the lock.
-- **Operator CLI**: Internal CLI only (`src/servers/knowledge/src/kb_mcp/ingestion/cli.py`, module execution: `python -m kb_mcp.ingestion.cli`, commands: `dry-run`, `ingest`). Supported local formats: `.md`, `.markdown`, `.txt`, Runbook `.json`, Known-Issue `.json`. (PDF, DOCX, HTML, OCR, and YAML are deferred).
+- **Internal Operator CLI**:
+  ```bash
+  # Execute dry-run admission and sanitization check
+  python -m kb_mcp.ingestion.cli dry-run path/to/document.md
+
+  # Ingest document into local knowledge base
+  python -m kb_mcp.ingestion.cli ingest path/to/document.md
+  ```
+  Supported local formats: `.md`, `.markdown`, `.txt`, Runbook `.json`, Known-Issue `.json`. (PDF, DOCX, HTML, OCR, and YAML are deferred).
 
 ---
 
-## Local Development Verification Baseline
+## Getting Started / Local Development
 
-The local development codebase is verified with 100% passing tests and zero lint/type errors:
+### Prerequisites
+- Python `>= 3.12`
+- `uv` package manager (`pip install uv` or install via official installer)
+- PowerShell 7+ (on Windows) or Bash (on Linux/macOS)
+
+### Setup Instructions
+1. **Clone and Install**:
+   ```bash
+   uv sync
+   ```
+
+2. **Configure Local Environment**:
+   ```bash
+   cp .env.example .env
+   ```
+   Edit `.env` to configure your local test database endpoints and local development JWT secret.
+
+3. **Pre-Flight Environment Check**:
+   ```powershell
+   powershell -File scripts/check-local.ps1
+   ```
+
+---
+
+## Verification & Quality Baseline
+
+The codebase maintains a 100% verified baseline with zero lint or type errors:
 
 ```bash
 # Run full regression suite (1043 passed, 11 skipped live-DB tests)
 uv run pytest
 
-# Static linting and style compliance (Ruff)
+# Linting and style verification
 uv run ruff check src tests
 uv run ruff format --check src tests
 
-# Strict type checking (Mypy across all packages)
+# Strict type checking
 uv run mypy src tests
 ```
 
@@ -146,27 +193,29 @@ The local development setup incorporates specific exceptions that must be replac
 2. **MSSQL Certificate Trust**: `DIAGNOSTICS_MSSQL_TRUST_SERVER_CERTIFICATE=true` for local development SQL Server.
 3. **Symmetric JWT Signing**: Local tests use `HS256` shared secrets; production requires asymmetric JWT validation / JWKS.
 4. **Local Database & Cache**: Local PostgreSQL on `127.0.0.1:5432` and locally cached FastEmbed model weights.
-5. **Local Artifact Store**: Knowledge artifacts stored in a local filesystem directory (durable production storage architecture TBD during Production Readiness Program).
+5. **Local Artifact Store**: Knowledge artifacts stored in a local filesystem directory.
 
 ---
 
-## What Local Development Release 1.0 Does NOT Claim
+## Documentation Index
 
-> [!WARNING]
-> **Production Boundary Notice**
-> 
-> Local Development Release 1.0 is verified strictly for **local development, offline testing, and architecture validation**. It does **NOT** claim:
-> - Production deployment or live production operational readiness.
-> - Production network trust, service isolation, or service-to-service cryptographic trust mechanisms.
-> - High availability (HA), multi-instance failover, or disaster recovery (DR).
-> - Production secrets manager integration (Vault, AWS Secrets Manager, Azure Key Vault).
-> - Production CI/CD promotion pipelines.
-> - Resolution of Decision D08 (live CRM transmission to external AI remains unapproved).
+| Document | Description |
+| :--- | :--- |
+| [Project Status & Inventory](docs/project-status.md) | Authoritative platform status, gate history, tool inventory, and operational status |
+| [Architecture Specification](docs/architecture.md) | Comprehensive Six-Layer Architecture, service topologies, and isolation boundaries |
+| [Server Responsibilities](docs/server-responsibilities.md) | Individual MCP server boundaries, port allocations, and responsibility contracts |
+| [Security Model & Threat Matrix](docs/security-model.md) | Threat modeling, RBAC policy definitions, data classification, and audit policies |
+| [Investigation Flow](docs/investigation-flow.md) | Investigation Engine state machine, hypothesis evaluator, and incident timeline correlation |
+| [Data Classification Guide](docs/data-classification.md) | Data level hierarchy (`PUBLIC`, `INTERNAL`, `CONFIDENTIAL`, `RESTRICTED`) and handling rules |
+| [Architecture Decision Records (ADRs)](docs/adr/) | Canonical architectural decisions (ADR 001 through ADR 012, Decision Ledger D01–D09) |
+| [Security Policy](SECURITY.md) | Security vulnerability disclosure, responsible reporting, and boundary invariants |
+| [Contributing Guide](CONTRIBUTING.md) | Contribution workflows, coding conventions, testing gates, and security rules |
+| [Changelog](CHANGELOG.md) | Complete version history and milestone release notes |
 
 ---
 
 ## Roadmap
 
 - **FLC.4**: Local Development Release 1.0 Checkpoint & Git Tag (`COMPLETE / APPROVED` — `v1.0.0-local.1`).
-- **FLC.5**: Repository Professionalization & Remote Publication (Git history audit, private repo push).
+- **FLC.5**: Repository Professionalization & Remote Publication (Git history audit, provider-neutral hygiene, private repo push).
 - **PR.0–PR.12**: Production Readiness Program (Production deployment, containerization, PKI, network policies, HA/DR, and operational acceptance).

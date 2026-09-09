@@ -1,74 +1,73 @@
 # Python
-
-**pycache**/
+__pycache__/
+**/__pycache__/
 *.py[cod]
 *.pyo
 *.pyd
 
 # Virtual environments
-
 .venv/
 venv/
 env/
 
 # Environment / secrets
-
 .env
 .env.*
+.env.local
 !.env.example
 
 # IDE
-
 .vscode/
 .idea/
 *.swp
 *.swo
 
 # Testing
-
 .pytest_cache/
 .coverage
 htmlcov/
 .coverage.*
 
 # Type checking
-
 .mypy_cache/
 .pyright/
 
 # Linting
-
 .ruff_cache/
 
 # Build
-
 build/
 dist/
 *.egg-info/
 
 # OS
-
 .DS_Store
 Thumbs.db
+desktop.ini
+$RECYCLE.BIN/
 
 # Logs
-
 *.log
 logs/
 
 # Temporary files
-
 tmp/
 temp/
 
-# Local databases
-
+# Local databases and dumps
 *.db
 *.sqlite
 *.sqlite3
+*.bak
+*.dmp
+*.dump
+
+# Local model caches
+.fastembed_cache/
+local_cache/
+models/
 
 # Customer / production data
-
 customer-data/
 production-data/
 production-logs/
@@ -77,15 +76,16 @@ exports/
 backups/
 
 # Certificates and keys
-
 *.pem
 *.key
 *.crt
 *.p12
 *.pfx
 
-# Generated artifacts
-
-artifacts/
+# Local Knowledge runtime artifacts (anchored)
+/artifacts/
+/data/knowledge/
+/data/
+local-artifacts/
 
 

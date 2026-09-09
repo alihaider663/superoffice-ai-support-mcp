@@ -1,0 +1,32 @@
+# Auto detect text files and perform LF normalization on checkout
+* text=auto
+
+# Explicit text file handling with LF line endings
+*.py text eol=lf
+*.md text eol=lf
+*.toml text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.json text eol=lf
+*.txt text eol=lf
+*.sql text eol=lf
+*.sh text eol=lf
+
+# Windows PowerShell scripts
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary file handling
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.onnx binary
+*.bin binary
+*.safetensors binary
+*.tar.gz binary
+*.zip binary
+*.7z binary

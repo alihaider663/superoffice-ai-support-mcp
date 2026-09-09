@@ -58,11 +58,12 @@ if (Test-Path $envPath) {
 
 Write-Host ""
 Write-Host "[3] Local TCP Ports (127.0.0.1):" -ForegroundColor Yellow
-$ports = @(8000, 8001, 8002, 8005)
+$ports = @(8000, 8001, 8002, 8003, 8005)
 $portLabels = @{
     8000 = "Gateway"
     8001 = "SuperOffice MCP"
     8002 = "Diagnostics MCP"
+    8003 = "Knowledge MCP"
     8005 = "Investigation MCP"
 }
 
@@ -77,34 +78,59 @@ foreach ($port in $ports) {
 
 Write-Host ""
 Write-Host "[4] SuperOffice Upstream Network Reachability:" -ForegroundColor Yellow
-$soHost = "superoffice.example.internal"
-$soDns = Resolve-DnsName $soHost -ErrorAction SilentlyContinue | Select-Object -First 1
-if ($soDns) {
-    Write-Host "    SuperOffice DNS ($soHost) : RESOLVED ($($soDns.IPAddress))" -ForegroundColor Green
-    $soTcp = Test-NetConnection -ComputerName $soHost -Port 443 -WarningAction SilentlyContinue
-    if ($soTcp.TcpTestSucceeded) {
-        Write-Host "    SuperOffice TCP/443 : REACHABLE (VPN Active)" -ForegroundColor Green
+$soUrlVal = if ($env:SUPEROFFICE_API_URL) { $env:SUPEROFFICE_API_URL } else {
+    if ($envContent) {
+        $line = $envContent | Where-Object { $_ -match "^\s*SUPEROFFICE_API_URL\s*=" } | Select-Object -First 1
+        if ($line) { ($line -split "=", 2)[1].Trim() }
+    }
+}
+$soHost = if ($soUrlVal -and $soUrlVal -notmatch "example\.internal") {
+    try { ([System.Uri]$soUrlVal).Host } catch { $null }
+} else { $null }
+
+if ($soHost) {
+    $soDns = Resolve-DnsName $soHost -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($soDns) {
+        Write-Host "    SuperOffice DNS ($soHost) : RESOLVED ($($soDns.IPAddress))" -ForegroundColor Green
+        $soTcp = Test-NetConnection -ComputerName $soHost -Port 443 -WarningAction SilentlyContinue
+        if ($soTcp.TcpTestSucceeded) {
+            Write-Host "    SuperOffice TCP/443 : REACHABLE" -ForegroundColor Green
+        } else {
+            Write-Host "    SuperOffice TCP/443 : UNREACHABLE" -ForegroundColor Red
+        }
     } else {
-        Write-Host "    SuperOffice TCP/443 : UNREACHABLE" -ForegroundColor Red
+        Write-Host "    SuperOffice DNS ($soHost) : FAILED (Check network/VPN connection)" -ForegroundColor Red
     }
 } else {
-    Write-Host "    SuperOffice DNS ($soHost) : FAILED (Check VPN connection)" -ForegroundColor Red
+    Write-Host "    SuperOffice Upstream : NOT CONFIGURED / PLACEHOLDER (Set SUPEROFFICE_API_URL in .env)" -ForegroundColor Yellow
 }
 
 Write-Host ""
 Write-Host "[5] Diagnostics MSSQL Upstream Reachability:" -ForegroundColor Yellow
-$sqlHost = "sql.example.internal"
-$sqlDns = Resolve-DnsName $sqlHost -ErrorAction SilentlyContinue | Select-Object -First 1
-if ($sqlDns) {
-    Write-Host "    MSSQL DNS ($sqlHost) : RESOLVED ($($sqlDns.IPAddress))" -ForegroundColor Green
-    $sqlTcp = Test-NetConnection -ComputerName $sqlHost -Port 1433 -WarningAction SilentlyContinue
-    if ($sqlTcp.TcpTestSucceeded) {
-        Write-Host "    MSSQL TCP/1433 : REACHABLE" -ForegroundColor Green
+$sqlHostVal = if ($env:DIAGNOSTICS_MSSQL_HOST) { $env:DIAGNOSTICS_MSSQL_HOST } else {
+    if ($envContent) {
+        $line = $envContent | Where-Object { $_ -match "^\s*DIAGNOSTICS_MSSQL_HOST\s*=" } | Select-Object -First 1
+        if ($line) { ($line -split "=", 2)[1].Trim() }
+    }
+}
+$sqlHost = if ($sqlHostVal -and $sqlHostVal -notmatch "example\.internal") { $sqlHostVal } else { $null }
+
+if ($sqlHost) {
+    $sqlDns = Resolve-DnsName $sqlHost -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($sqlDns) {
+        Write-Host "    MSSQL DNS ($sqlHost) : RESOLVED ($($sqlDns.IPAddress))" -ForegroundColor Green
+        $sqlPort = if ($env:DIAGNOSTICS_MSSQL_PORT) { [int]$env:DIAGNOSTICS_MSSQL_PORT } else { 1433 }
+        $sqlTcp = Test-NetConnection -ComputerName $sqlHost -Port $sqlPort -WarningAction SilentlyContinue
+        if ($sqlTcp.TcpTestSucceeded) {
+            Write-Host "    MSSQL TCP/$sqlPort : REACHABLE" -ForegroundColor Green
+        } else {
+            Write-Host "    MSSQL TCP/$sqlPort : NETWORK RESTRICTED / TIMED OUT" -ForegroundColor Yellow
+        }
     } else {
-        Write-Host "    MSSQL TCP/1433 : NETWORK RESTRICTED / TIMED OUT (Expected in Mode A)" -ForegroundColor Yellow
+        Write-Host "    MSSQL DNS ($sqlHost) : UNRESOLVED" -ForegroundColor Yellow
     }
 } else {
-    Write-Host "    MSSQL DNS ($sqlHost) : UNRESOLVED" -ForegroundColor Yellow
+    Write-Host "    Diagnostics MSSQL : NOT CONFIGURED / LOCAL DEFAULT (Set DIAGNOSTICS_MSSQL_HOST in .env)" -ForegroundColor Yellow
 }
 
 Write-Host ""
