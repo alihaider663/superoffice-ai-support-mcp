@@ -96,6 +96,11 @@ class AdmissionSourceInputDTO(PlatformBaseModel):
         default=None,
         description="Optional security classification label (e.g. customer_attachment, live_crm)",
     )
+    source_reference: str | None = Field(
+        default=None,
+        max_length=128,
+        description="Optional explicit logical provenance reference (e.g. docs://..., sop://...)",
+    )
 
 
 # ============================================================================
@@ -112,6 +117,11 @@ class SanitizedDocumentPayloadDTO(PlatformBaseModel):
     source_kind: IngestionSourceKind = Field(..., description="Document source kind")
     corpus_category: CorpusCategory = Field(..., description="Admitted corpus category")
     canonical_text: str = Field(..., description="Sanitized, normalized UTF-8 text")
+    source_reference: str | None = Field(
+        default=None,
+        max_length=128,
+        description="Validated logical provenance reference",
+    )
 
 
 class SanitizedRunbookPayloadDTO(PlatformBaseModel):
@@ -217,4 +227,115 @@ class AdmissionResult(PlatformBaseModel):
     warnings: tuple[str, ...] = Field(
         default=(),
         description="Safe non-sensitive operational warnings",
+    )
+
+
+# ============================================================================
+# Canonical Document & Artifact DTOs (Gate 7D.5C / Local-v1)
+# ============================================================================
+
+
+class CanonicalKnowledgeDocumentDTO(PlatformBaseModel):
+    """Immutable, approved canonical knowledge document ready for artifact storage and indexing."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    document_id: str = Field(
+        ...,
+        min_length=1,
+        max_length=64,
+        description="Deterministic document identifier (doc_<24_hex>)",
+    )
+    title: str = Field(
+        ...,
+        min_length=1,
+        max_length=255,
+        description="Sanitized document title",
+    )
+    document_type: str = Field(
+        ...,
+        min_length=1,
+        max_length=50,
+        description="Allowlisted document type category",
+    )
+    source_reference: str = Field(
+        ...,
+        min_length=1,
+        max_length=128,
+        description="Safe logical provenance reference URI",
+    )
+    canonical_content: str = Field(
+        ...,
+        min_length=1,
+        description="Sanitized, normalized canonical UTF-8 content",
+    )
+    content_hash: str = Field(
+        ...,
+        min_length=64,
+        max_length=64,
+        description="Deterministic SHA-256 lowercase hex digest of canonical_content",
+    )
+    corpus_category: CorpusCategory = Field(
+        ...,
+        description="Associated corpus category",
+    )
+    structured_payload: SanitizedRunbookPayloadDTO | SanitizedKnownIssuePayloadDTO | None = Field(
+        default=None,
+        description="Optional parsed structured payload for runbooks or known issues",
+    )
+
+
+class StagedArtifactToken(PlatformBaseModel):
+    """Opaque reference token for a staged artifact in temporary storage."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    staging_id: str = Field(
+        ...,
+        min_length=1,
+        max_length=128,
+        description="Safe temporary staging identifier (e.g. doc_<hash>_<uuid>.tmp)",
+    )
+    document_id: str = Field(
+        ...,
+        min_length=1,
+        max_length=64,
+        description="Deterministic document identifier",
+    )
+    document_type: str = Field(
+        ...,
+        min_length=1,
+        max_length=50,
+        description="Allowlisted document type",
+    )
+    content_hash: str = Field(
+        ...,
+        min_length=64,
+        max_length=64,
+        description="Expected SHA-256 content hash",
+    )
+
+
+class ApprovedArtifactRecord(PlatformBaseModel):
+    """Logical descriptor of an approved, content-addressed artifact in storage."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    document_type: str = Field(
+        ...,
+        min_length=1,
+        max_length=50,
+        description="Allowlisted document type",
+    )
+    document_id: str = Field(
+        ...,
+        min_length=1,
+        max_length=64,
+        description="Deterministic document identifier",
+    )
+    content_hash: str = Field(
+        ...,
+        min_length=64,
+        max_length=64,
+        description="SHA-256 content hash",
     )

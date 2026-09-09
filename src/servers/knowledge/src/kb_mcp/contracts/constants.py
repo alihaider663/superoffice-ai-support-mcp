@@ -49,3 +49,22 @@ KNOWN_ISSUE_PRODUCT_MAX_LENGTH: Final[int] = 100
 KNOWN_ISSUE_MAX_AFFECTED_VERSIONS: Final[int] = 20
 KNOWN_ISSUE_VERSION_MAX_LENGTH: Final[int] = 50
 KNOWN_ISSUE_CATEGORY_MAX_LENGTH: Final[int] = 50
+
+# ============================================================================
+# Canonical Document Identity & Artifact Bounds (Gate 7D.5C / Local-v1)
+# ============================================================================
+
+DOCUMENT_ID_PREFIX: Final[str] = "doc_"
+DOCUMENT_ID_HASH_CHARS: Final[int] = 24
+DOCUMENT_ID_MAX_LENGTH: Final[int] = 64
+DOCUMENT_TYPE_MAX_LENGTH: Final[int] = 50
+SOURCE_REFERENCE_MAX_LENGTH: Final[int] = 128
+CONTENT_HASH_HEX_LENGTH: Final[int] = 64
+
+ALLOWED_DOCUMENT_TYPES: Final[frozenset[str]] = frozenset(
+    {"documentation", "sop", "runbook", "known_issue", "incident_pattern"}
+)
+
+ALLOWED_PROVENANCE_SCHEMES: Final[frozenset[str]] = frozenset(
+    {"docs://", "sop://", "runbook://", "known-issue://", "incident-pattern://"}
+)

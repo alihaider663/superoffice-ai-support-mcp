@@ -1,4 +1,4 @@
-"""Knowledge Base MCP Server configuration."""
+from pathlib import Path
 
 from pydantic import Field, HttpUrl, PositiveInt, SecretStr, field_validator
 from pydantic_settings import SettingsConfigDict
@@ -86,6 +86,12 @@ class KnowledgeServerSettings(BasePlatformSettings):
     embedding_cache_dir: str | None = Field(
         default=None,
         description="Optional custom directory for FastEmbed cached model artifacts",
+    )
+    artifact_root: Path | None = Field(
+        default=None,
+        description=(
+            "Safe directory root for knowledge base artifact storage (KNOWLEDGE_ARTIFACT_ROOT)"
+        ),
     )
 
     @field_validator("embedding_model")

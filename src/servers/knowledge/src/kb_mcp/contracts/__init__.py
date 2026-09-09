@@ -1,7 +1,14 @@
 """Knowledge contract definitions, DTOs, errors, constants, and protocol interfaces."""
 
 from kb_mcp.contracts.constants import (
+    ALLOWED_DOCUMENT_TYPES,
+    ALLOWED_PROVENANCE_SCHEMES,
+    CONTENT_HASH_HEX_LENGTH,
     DEFAULT_EMBEDDING_MODEL,
+    DOCUMENT_ID_HASH_CHARS,
+    DOCUMENT_ID_MAX_LENGTH,
+    DOCUMENT_ID_PREFIX,
+    DOCUMENT_TYPE_MAX_LENGTH,
     EMBEDDING_DIMENSION,
     KNOWN_ISSUE_CATEGORY_MAX_LENGTH,
     KNOWN_ISSUE_FIX_REF_MAX_LENGTH,
@@ -34,6 +41,7 @@ from kb_mcp.contracts.constants import (
     RUNBOOK_TITLE_MAX_LENGTH,
     RUNBOOK_TITLE_MIN_LENGTH,
     RUNBOOK_VERIFIED_VERSION_MAX_LENGTH,
+    SOURCE_REFERENCE_MAX_LENGTH,
 )
 from kb_mcp.contracts.dtos import (
     KnowledgeSearchCriteriaDTO,
@@ -52,6 +60,7 @@ from kb_mcp.contracts.errors import (
     EmbeddingInputError,
     EmbeddingModelInitializationError,
     KnowledgeAdmissionError,
+    KnowledgeArtifactError,
     KnowledgeBackendNotConfiguredError,
     KnowledgeContentRejectedError,
     KnowledgeIngestionError,
@@ -67,6 +76,8 @@ from kb_mcp.contracts.ingestion import (
     AdmissionReasonCode,
     AdmissionResult,
     AdmissionSourceInputDTO,
+    ApprovedArtifactRecord,
+    CanonicalKnowledgeDocumentDTO,
     CorpusCategory,
     IngestionSourceKind,
     ProhibitedSourceClassification,
@@ -74,14 +85,23 @@ from kb_mcp.contracts.ingestion import (
     SanitizedIngestionPayload,
     SanitizedKnownIssuePayloadDTO,
     SanitizedRunbookPayloadDTO,
+    StagedArtifactToken,
 )
 from kb_mcp.contracts.interfaces import (
     EmbeddingProvider,
+    KnowledgeArtifactStore,
     KnowledgeRepository,
 )
 
 __all__ = [
+    "ALLOWED_DOCUMENT_TYPES",
+    "ALLOWED_PROVENANCE_SCHEMES",
+    "CONTENT_HASH_HEX_LENGTH",
     "DEFAULT_EMBEDDING_MODEL",
+    "DOCUMENT_ID_HASH_CHARS",
+    "DOCUMENT_ID_MAX_LENGTH",
+    "DOCUMENT_ID_PREFIX",
+    "DOCUMENT_TYPE_MAX_LENGTH",
     "EMBEDDING_DIMENSION",
     "KNOWN_ISSUE_CATEGORY_MAX_LENGTH",
     "KNOWN_ISSUE_FIX_REF_MAX_LENGTH",
@@ -114,10 +134,13 @@ __all__ = [
     "RUNBOOK_TITLE_MAX_LENGTH",
     "RUNBOOK_TITLE_MIN_LENGTH",
     "RUNBOOK_VERIFIED_VERSION_MAX_LENGTH",
+    "SOURCE_REFERENCE_MAX_LENGTH",
     "AdmissionDecision",
     "AdmissionReasonCode",
     "AdmissionResult",
     "AdmissionSourceInputDTO",
+    "ApprovedArtifactRecord",
+    "CanonicalKnowledgeDocumentDTO",
     "CorpusCategory",
     "EmbeddingDimensionError",
     "EmbeddingError",
@@ -127,6 +150,8 @@ __all__ = [
     "EmbeddingProvider",
     "IngestionSourceKind",
     "KnowledgeAdmissionError",
+    "KnowledgeArtifactError",
+    "KnowledgeArtifactStore",
     "KnowledgeBackendNotConfiguredError",
     "KnowledgeContentRejectedError",
     "KnowledgeIngestionError",
@@ -150,4 +175,5 @@ __all__ = [
     "SanitizedIngestionPayload",
     "SanitizedKnownIssuePayloadDTO",
     "SanitizedRunbookPayloadDTO",
+    "StagedArtifactToken",
 ]

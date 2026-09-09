@@ -250,3 +250,25 @@ class KnowledgeSizeLimitExceededError(KnowledgeAdmissionError):
             error_code="KNOWLEDGE_SIZE_LIMIT_EXCEEDED",
             details=details,
         )
+
+
+# ============================================================================
+# Artifact Storage Errors (Gate 7D.5C / Local-v1)
+# ============================================================================
+
+
+class KnowledgeArtifactError(KnowledgeIngestionError):
+    """Raised when an error occurs during artifact staging, promotion, or storage operations."""
+
+    def __init__(
+        self,
+        message: str = "Artifact storage operation failed.",
+        *,
+        error_code: str = "KNOWLEDGE_ARTIFACT_ERROR",
+        details: dict[str, Any] | None = None,
+    ) -> None:
+        super().__init__(
+            message=message,
+            error_code=error_code,
+            details=details,
+        )

@@ -1,5 +1,9 @@
-"""Knowledge ingestion admission, parsing, normalization, and sanitization boundary (Gate 7D.5B)."""
-
+from kb_mcp.ingestion.canonical import (
+    build_canonical_document,
+    compute_content_hash,
+    generate_document_id,
+    validate_provenance,
+)
 from kb_mcp.ingestion.eligibility import (
     CorpusEligibilityPolicy,
     EligibilityResult,
@@ -33,7 +37,11 @@ __all__ = [
     "PlainTextParser",
     "RunbookJsonParser",
     "SanitizationOutcome",
+    "build_canonical_document",
+    "compute_content_hash",
     "decode_strict_utf8",
+    "generate_document_id",
     "is_safe_placeholder",
     "normalize_text",
+    "validate_provenance",
 ]

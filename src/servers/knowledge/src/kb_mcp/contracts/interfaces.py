@@ -10,6 +10,11 @@ from kb_mcp.contracts.dtos import (
     KnownIssueSearchCriteriaDTO,
     RunbookDetailDomainDTO,
 )
+from kb_mcp.contracts.ingestion import (
+    ApprovedArtifactRecord,
+    CanonicalKnowledgeDocumentDTO,
+    StagedArtifactToken,
+)
 
 
 @runtime_checkable
@@ -83,5 +88,83 @@ class EmbeddingProvider(Protocol):
             EmbeddingInputError: If any document is empty, whitespace-only, or invalid.
             EmbeddingInferenceError: If inference fails or count does not match.
             EmbeddingDimensionError: If any embedding dimension does not match 384.
+        """
+        ...
+
+
+@runtime_checkable
+class KnowledgeArtifactStore(Protocol):
+    """Protocol for safe, isolated knowledge artifact storage operations."""
+
+    def stage(self, document: CanonicalKnowledgeDocumentDTO) -> StagedArtifactToken:
+        """Stage an approved canonical document to temporary staging storage.
+
+        Args:
+            document: Approved canonical document DTO.
+
+        Returns:
+            StagedArtifactToken referencing the staged artifact.
+
+        Raises:
+            KnowledgeArtifactError: If staging fails or bounds exceeded.
+        """
+        ...
+
+    def promote(
+        self,
+        token: StagedArtifactToken,
+        document: CanonicalKnowledgeDocumentDTO,
+    ) -> ApprovedArtifactRecord:
+        """Atomically promote a staged artifact to content-addressed approved storage.
+
+        Args:
+            token: Valid StagedArtifactToken from prior stage operation.
+            document: Approved canonical document DTO matching the token.
+
+        Returns:
+            ApprovedArtifactRecord representing the promoted artifact.
+
+        Raises:
+            KnowledgeArtifactError: If promotion fails or hash mismatch occurs.
+        """
+        ...
+
+    def discard_staged(self, token: StagedArtifactToken) -> bool:
+        """Discard/remove a temporary staged artifact.
+
+        Args:
+            token: StagedArtifactToken to remove.
+
+        Returns:
+            True if removed, False if already absent.
+        """
+        ...
+
+    def remove_unreferenced(
+        self,
+        document_type: str,
+        document_id: str,
+        content_hash: str,
+    ) -> bool:
+        """Safely remove a verified unreferenced approved artifact.
+
+        Args:
+            document_type: Allowlisted document type.
+            document_id: Validated deterministic document identifier.
+            content_hash: Validated 64-char lowercase hex content hash.
+
+        Returns:
+            True if removed, False if already absent.
+
+        Raises:
+            KnowledgeArtifactError: If identifier parameters are invalid or outside root.
+        """
+        ...
+
+    def enumerate_approved_artifacts(self) -> list[ApprovedArtifactRecord]:
+        """Enumerate all approved artifact records currently in storage for reconciliation.
+
+        Returns:
+            List of approved artifact records (without exposing physical paths).
         """
         ...

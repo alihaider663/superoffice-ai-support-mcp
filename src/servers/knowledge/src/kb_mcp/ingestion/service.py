@@ -1,9 +1,9 @@
-"""Admission coordinator and evaluation service for knowledge ingestion (Gate 7D.5B)."""
-
+import re
 from typing import Final
 
 from kb_mcp.contracts.constants import MAX_CANONICAL_TEXT_BYTES
 from kb_mcp.contracts.errors import (
+    KnowledgeAdmissionError,
     KnowledgeContentRejectedError,
     KnowledgeSizeLimitExceededError,
     KnowledgeSourceFormatError,
@@ -13,11 +13,13 @@ from kb_mcp.contracts.ingestion import (
     AdmissionReasonCode,
     AdmissionResult,
     AdmissionSourceInputDTO,
+    CorpusCategory,
     IngestionSourceKind,
     SanitizedDocumentPayloadDTO,
     SanitizedKnownIssuePayloadDTO,
     SanitizedRunbookPayloadDTO,
 )
+from kb_mcp.ingestion.canonical import validate_provenance
 from kb_mcp.ingestion.eligibility import CorpusEligibilityPolicy
 from kb_mcp.ingestion.normalization import normalize_text
 from kb_mcp.ingestion.parsers import (
@@ -99,6 +101,9 @@ class KnowledgeAdmissionService:
         ):
             raise KnowledgeSizeLimitExceededError(result.message)
 
+        if result.reason_code == AdmissionReasonCode.INVALID_PROVENANCE:
+            raise KnowledgeAdmissionError(result.message, error_code="INVALID_PROVENANCE")
+
         raise KnowledgeSourceFormatError(result.message)
 
     # ------------------------------------------------------------------------
@@ -168,11 +173,36 @@ class KnowledgeAdmissionService:
                 ),
             )
 
+        # Validate or derive logical source_reference
+        if source_input.source_reference is not None:
+            try:
+                validate_provenance(source_input.source_reference, source_input.corpus_category)
+                doc_source_ref = source_input.source_reference
+            except Exception as exc:
+                return AdmissionResult(
+                    decision=AdmissionDecision.REJECTED,
+                    reason_code=AdmissionReasonCode.INVALID_PROVENANCE,
+                    message=f"Invalid provenance source_reference: {exc}",
+                )
+        else:
+            scheme = (
+                "docs://"
+                if source_input.corpus_category == CorpusCategory.DOCUMENTATION
+                else "sop://"
+                if source_input.corpus_category == CorpusCategory.SOP
+                else "incident-pattern://"
+            )
+            clean_name = re.sub(
+                r"\.(md|txt)$", "", source_input.source_name, flags=re.IGNORECASE
+            ).strip()
+            doc_source_ref = f"{scheme}{clean_name}"
+
         payload = SanitizedDocumentPayloadDTO(
             source_name=source_input.source_name,
             source_kind=source_input.source_kind,
             corpus_category=source_input.corpus_category,
             canonical_text=canonical_text,
+            source_reference=doc_source_ref,
         )
         return AdmissionResult(
             decision=AdmissionDecision.APPROVED,
