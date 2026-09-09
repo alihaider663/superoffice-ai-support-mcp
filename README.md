@@ -4,18 +4,23 @@
 [![MCP Official SDK](https://img.shields.io/badge/MCP-Official%20SDK-orange.svg)](https://modelcontextprotocol.io/)
 [![Status](https://img.shields.io/badge/Status-Local%20Development%20Release%201.0-brightgreen.svg)]()
 [![Regression Tests](https://img.shields.io/badge/Tests-1043%20Passed-success.svg)]()
-[![License](https://img.shields.io/badge/License-Pending%20Confirmation-lightgrey.svg)]()
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 An enterprise-grade, secure, modular Model Context Protocol (MCP) platform for AI-assisted SuperOffice CRM support triage, diagnostic telemetry, and cross-system incident investigation.
 
 The platform bridges external LLM reasoning engines (such as Claude Desktop, Cursor, and autonomous support agents) with Onsite SuperOffice CRM REST APIs, Microsoft SQL Server database diagnostics, PostgreSQL/pgvector knowledge stores, and infrastructure boundaries under strict security, data minimization, and audit controls.
+
+> [!NOTE]
+> **Independent Integration Project & Trademark Notice**
+> 
+> This is an independent open-source integration project and is not an official SuperOffice product. SuperOffice and all other product names, logos, and brands are property of their respective owners. Mention of third-party trademarks does not imply endorsement, affiliation, or sponsorship.
 
 > [!WARNING]
 > **Production Boundary Disclaimer**
 > 
 > **Current Release:** `v1.0.0-local.1` (Local Development Release 1.0) — **COMPLETE / APPROVED**.  
 > **Production Ready:** **NO**.  
-> **Repository Professionalization:** IN PROGRESS (FLC.5B).  
+> **Repository Professionalization:** IN PROGRESS (FLC.5C).  
 > **Remote Publication:** NOT YET PERFORMED.  
 > **Production Readiness Program:** FUTURE / NOT STARTED.  
 > 

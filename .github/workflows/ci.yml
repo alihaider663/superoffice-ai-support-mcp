@@ -1,0 +1,46 @@
+name: CI
+
+'on':
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Code Quality & Regression Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 1
+
+      - name: Install uv and Python 3.12
+        uses: astral-sh/setup-uv@a6772c8f0a09dc9e3582c70a994b0c55af921803 # v5.1.0
+        with:
+          python-version: "3.12"
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Lint compliance (Ruff)
+        run: uv run ruff check src tests
+
+      - name: Format compliance (Ruff)
+        run: uv run ruff format --check src tests
+
+      - name: Type checking (Mypy)
+        run: uv run mypy src tests
+
+      - name: Test regression suite (Pytest)
+        run: uv run pytest

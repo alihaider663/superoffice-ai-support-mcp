@@ -1,0 +1,8 @@
+# Global repository code owner
+* @alihaider663
+
+# Core architecture, security, and MCP servers
+/src/ @alihaider663
+/tests/ @alihaider663
+/docs/ @alihaider663
+/.github/ @alihaider663

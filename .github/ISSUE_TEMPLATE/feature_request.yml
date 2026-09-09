@@ -1,0 +1,57 @@
+name: Feature Request
+description: Suggest a new capability or architectural improvement
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Architecture Policy Reminder**: Feature proposals must respect the platform's core security invariants:
+        - **Six-Layer Architecture**: No direct AI access to databases or backend infrastructure.
+        - **Deny-by-Default RBAC**: Every new tool must have explicit role permissions.
+        - **Database Safety**: Pre-vetted queries under SNAPSHOT isolation; no arbitrary SQL (D01, D02, D09).
+        - **Attachment Protection**: Metadata only; no raw attachment file extraction (D05).
+        - **Data Minimization Boundary**: No live CRM data export to external AI models (D08).
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or Use Case
+      description: What diagnostic, triage, or support challenge does this feature address?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed Capability
+      description: Describe the proposed tool, service, or interface change.
+    validations:
+      required: true
+  - type: dropdown
+    id: component
+    attributes:
+      label: Affected Component
+      options:
+        - Platform Gateway
+        - SuperOffice MCP (so-mcp)
+        - Diagnostics MCP (diag-mcp)
+        - Knowledge MCP (kb-mcp)
+        - Investigation MCP (investigation-mcp)
+        - Security / RBAC
+        - Ingestion Pipeline
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: security_impact
+    attributes:
+      label: Security & Data Impact
+      description: How does this proposal impact access control, data classification, and PII redaction?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Any alternative designs, workarounds, or approaches considered?
+    validations:
+      required: false
