@@ -1,6 +1,7 @@
 """Protocol interfaces for Knowledge repository, retrieval, and embedding boundaries."""
 
 from collections.abc import Sequence
+from contextlib import AbstractAsyncContextManager
 from typing import Protocol, runtime_checkable
 
 from kb_mcp.contracts.dtos import (
@@ -13,6 +14,10 @@ from kb_mcp.contracts.dtos import (
 from kb_mcp.contracts.ingestion import (
     ApprovedArtifactRecord,
     CanonicalKnowledgeDocumentDTO,
+    DocumentStateDTO,
+    EmbeddedChunkDTO,
+    SanitizedKnownIssuePayloadDTO,
+    SanitizedRunbookPayloadDTO,
     StagedArtifactToken,
 )
 
@@ -167,4 +172,61 @@ class KnowledgeArtifactStore(Protocol):
         Returns:
             List of approved artifact records (without exposing physical paths).
         """
+        ...
+
+
+@runtime_checkable
+class KnowledgeIngestionTransaction(Protocol):
+    """Scoped transactional boundary for knowledge document and chunk mutation."""
+
+    async def get_locked_document_state(self) -> DocumentStateDTO | None:
+        """Fetch locked document state (document_id, content_hash, version) under FOR UPDATE."""
+        ...
+
+    async def persist_document(
+        self,
+        document: CanonicalKnowledgeDocumentDTO,
+        version: int,
+    ) -> None:
+        """Insert new document or update existing document with version and canonical content."""
+        ...
+
+    async def persist_chunks(
+        self,
+        chunks: Sequence[EmbeddedChunkDTO],
+    ) -> None:
+        """Atomically replace all chunks for the document with complete embedded chunk set."""
+        ...
+
+    async def persist_runbook(
+        self,
+        runbook: SanitizedRunbookPayloadDTO,
+    ) -> None:
+        """Upsert structured operational runbook record."""
+        ...
+
+    async def persist_known_issue(
+        self,
+        known_issue: SanitizedKnownIssuePayloadDTO,
+    ) -> None:
+        """Upsert structured known issue record."""
+        ...
+
+
+@runtime_checkable
+class KnowledgeIngestionRepository(Protocol):
+    """Repository protocol for knowledge document persistence, state checks, and locking."""
+
+    async def get_document_state(self, document_id: str) -> DocumentStateDTO | None:
+        """Cheap read-only check of document state without holding transaction locks."""
+        ...
+
+    async def is_document_hash_referenced(self, document_id: str, content_hash: str) -> bool:
+        """Check if an approved content hash is referenced by committed active knowledge."""
+        ...
+
+    def document_transaction(
+        self, document_id: str
+    ) -> AbstractAsyncContextManager[KnowledgeIngestionTransaction]:
+        """Open a transaction-scoped boundary with a document-scoped PostgreSQL advisory lock."""
         ...

@@ -15,6 +15,9 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy.pool import AsyncAdaptedQueuePool
 
 from kb_mcp.adapters.fastembed_provider import FastEmbedEmbeddingProvider
+from kb_mcp.adapters.postgres_ingestion_repository import (
+    PostgresKnowledgeIngestionRepository,
+)
 from kb_mcp.adapters.postgres_repository import PostgresKnowledgeRepository
 from kb_mcp.contracts.constants import DEFAULT_EMBEDDING_MODEL
 from kb_mcp.contracts.errors import (
@@ -89,6 +92,18 @@ def create_knowledge_repository(
         session_factory=session_factory,
         timeout_seconds=float(settings.timeout_seconds),
         max_results_ceiling=settings.max_search_results_ceiling,
+    )
+
+
+def create_knowledge_ingestion_repository(
+    settings: KnowledgeServerSettings,
+    *,
+    session_factory: async_sessionmaker[AsyncSession] | AsyncEngine,
+) -> PostgresKnowledgeIngestionRepository:
+    """Create a configured PostgresKnowledgeIngestionRepository."""
+    return PostgresKnowledgeIngestionRepository(
+        session_factory=session_factory,
+        timeout_seconds=float(settings.timeout_seconds),
     )
 
 

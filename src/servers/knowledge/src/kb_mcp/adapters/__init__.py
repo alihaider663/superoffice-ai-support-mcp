@@ -5,6 +5,7 @@ from kb_mcp.adapters.factory import (
     compose_knowledge_runtime,
     create_embedding_provider,
     create_knowledge_engine,
+    create_knowledge_ingestion_repository,
     create_knowledge_repository,
     create_knowledge_session_factory,
 )
@@ -13,6 +14,9 @@ from kb_mcp.adapters.filesystem_artifact_store import (
     FilesystemKnowledgeArtifactStore,
     validate_artifact_root,
 )
+from kb_mcp.adapters.postgres_ingestion_repository import (
+    PostgresKnowledgeIngestionRepository,
+)
 from kb_mcp.adapters.postgres_repository import PostgresKnowledgeRepository
 from kb_mcp.adapters.supabase_repository import SupabaseKnowledgeRepository
 
@@ -20,11 +24,13 @@ __all__ = [
     "FastEmbedEmbeddingProvider",
     "FilesystemKnowledgeArtifactStore",
     "KnowledgeRuntimeContext",
+    "PostgresKnowledgeIngestionRepository",
     "PostgresKnowledgeRepository",
     "SupabaseKnowledgeRepository",
     "compose_knowledge_runtime",
     "create_embedding_provider",
     "create_knowledge_engine",
+    "create_knowledge_ingestion_repository",
     "create_knowledge_repository",
     "create_knowledge_session_factory",
     "validate_artifact_root",

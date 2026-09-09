@@ -272,3 +272,42 @@ class KnowledgeArtifactError(KnowledgeIngestionError):
             error_code=error_code,
             details=details,
         )
+
+
+# ============================================================================
+# Chunking & Persistence Errors (Gate 7D.5D / Local-v1)
+# ============================================================================
+
+
+class KnowledgeChunkingError(KnowledgeIngestionError):
+    """Raised when deterministic chunking fails, produces zero chunks, or exceeds maximum limit."""
+
+    def __init__(
+        self,
+        message: str = "Knowledge document chunking failed.",
+        *,
+        error_code: str = "KNOWLEDGE_CHUNKING_ERROR",
+        details: dict[str, Any] | None = None,
+    ) -> None:
+        super().__init__(
+            message=message,
+            error_code=error_code,
+            details=details,
+        )
+
+
+class KnowledgePersistenceError(KnowledgeIngestionError):
+    """Raised when database ingestion transaction, advisory lock, or chunk persistence fails."""
+
+    def __init__(
+        self,
+        message: str = "Knowledge persistence operation failed.",
+        *,
+        error_code: str = "KNOWLEDGE_PERSISTENCE_ERROR",
+        details: dict[str, Any] | None = None,
+    ) -> None:
+        super().__init__(
+            message=message,
+            error_code=error_code,
+            details=details,
+        )

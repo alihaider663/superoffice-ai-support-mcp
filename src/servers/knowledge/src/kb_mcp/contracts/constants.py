@@ -68,3 +68,13 @@ ALLOWED_DOCUMENT_TYPES: Final[frozenset[str]] = frozenset(
 ALLOWED_PROVENANCE_SCHEMES: Final[frozenset[str]] = frozenset(
     {"docs://", "sop://", "runbook://", "known-issue://", "incident-pattern://"}
 )
+
+# ============================================================================
+# Deterministic Chunking & Ingestion Batching Bounds (Gate 7D.5D / Local-v1)
+# ============================================================================
+
+CHUNK_TARGET_TOKENS: Final[int] = 450
+CHUNK_MAX_TOKENS: Final[int] = 500
+CHUNK_OVERLAP_TOKENS: Final[int] = 64
+MAX_CHUNKS_PER_DOCUMENT: Final[int] = 100
+EMBEDDING_BATCH_CEILING: Final[int] = 32

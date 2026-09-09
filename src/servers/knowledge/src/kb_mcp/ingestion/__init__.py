@@ -4,11 +4,16 @@ from kb_mcp.ingestion.canonical import (
     generate_document_id,
     validate_provenance,
 )
+from kb_mcp.ingestion.chunking import (
+    DeterministicChunker,
+    count_tokens,
+)
 from kb_mcp.ingestion.eligibility import (
     CorpusEligibilityPolicy,
     EligibilityResult,
 )
 from kb_mcp.ingestion.normalization import normalize_text
+from kb_mcp.ingestion.orchestrator import KnowledgeIngestionCoordinator
 from kb_mcp.ingestion.parsers import (
     KnownIssueJsonParser,
     MarkdownParser,
@@ -27,8 +32,10 @@ from kb_mcp.ingestion.service import KnowledgeAdmissionService
 
 __all__ = [
     "CorpusEligibilityPolicy",
+    "DeterministicChunker",
     "EligibilityResult",
     "KnowledgeAdmissionService",
+    "KnowledgeIngestionCoordinator",
     "KnowledgeSanitizer",
     "KnownIssueJsonParser",
     "MarkdownParser",
@@ -39,6 +46,7 @@ __all__ = [
     "SanitizationOutcome",
     "build_canonical_document",
     "compute_content_hash",
+    "count_tokens",
     "decode_strict_utf8",
     "generate_document_id",
     "is_safe_placeholder",

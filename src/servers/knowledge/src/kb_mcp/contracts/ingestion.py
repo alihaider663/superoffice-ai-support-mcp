@@ -339,3 +339,118 @@ class ApprovedArtifactRecord(PlatformBaseModel):
         max_length=64,
         description="SHA-256 content hash",
     )
+
+
+# ============================================================================
+# Deterministic Chunking & Transaction Persistence DTOs (Gate 7D.5D / Local-v1)
+# ============================================================================
+
+
+class ChunkDraftDTO(PlatformBaseModel):
+    """Pre-embedding draft chunk produced by DeterministicChunker."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    chunk_id: str = Field(
+        ...,
+        min_length=1,
+        max_length=64,
+        description="Deterministic chunk identifier (<doc_id>_c<idx:04d>)",
+    )
+    document_id: str = Field(
+        ...,
+        min_length=1,
+        max_length=64,
+        description="Deterministic document identifier",
+    )
+    chunk_index: int = Field(
+        ...,
+        ge=0,
+        description="0-based sequential chunk index",
+    )
+    content: str = Field(
+        ...,
+        min_length=1,
+        description="Sanitized chunk text content",
+    )
+
+
+class EmbeddedChunkDTO(PlatformBaseModel):
+    """DB-ready chunk enriched with validated dense vector embedding."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    chunk_id: str = Field(
+        ...,
+        min_length=1,
+        max_length=64,
+        description="Deterministic chunk identifier (<doc_id>_c<idx:04d>)",
+    )
+    document_id: str = Field(
+        ...,
+        min_length=1,
+        max_length=64,
+        description="Deterministic document identifier",
+    )
+    chunk_index: int = Field(
+        ...,
+        ge=0,
+        description="0-based sequential chunk index",
+    )
+    content: str = Field(
+        ...,
+        min_length=1,
+        description="Sanitized chunk text content",
+    )
+    embedding: tuple[float, ...] = Field(
+        ...,
+        min_length=384,
+        max_length=384,
+        description="384-dimensional dense vector embedding",
+    )
+
+
+class DocumentStateDTO(PlatformBaseModel):
+    """Lightweight document state descriptor for fast-path idempotency checks."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    document_id: str = Field(
+        ...,
+        min_length=1,
+        max_length=64,
+        description="Deterministic document identifier",
+    )
+    content_hash: str = Field(
+        ...,
+        min_length=64,
+        max_length=64,
+        description="Current 64-char SHA-256 content hash in database",
+    )
+    version: int = Field(
+        ...,
+        ge=1,
+        description="Current document version in database",
+    )
+
+
+class IngestionStatus(StrEnum):
+    """Outcome status of an ingestion operation."""
+
+    APPROVED = "APPROVED"
+    UNCHANGED = "UNCHANGED"
+
+
+class IngestionResultDTO(PlatformBaseModel):
+    """Safe logical result returned by KnowledgeIngestionCoordinator."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    status: IngestionStatus = Field(..., description="Ingestion outcome status")
+    document_id: str = Field(..., min_length=1, max_length=64, description="Document identifier")
+    source_reference: str = Field(
+        ..., min_length=1, max_length=128, description="Logical provenance reference"
+    )
+    content_hash: str = Field(..., min_length=64, max_length=64, description="SHA-256 content hash")
+    version: int = Field(..., ge=1, description="Committed document version")
+    chunk_count: int = Field(..., ge=0, description="Count of persisted chunks (0 if UNCHANGED)")
