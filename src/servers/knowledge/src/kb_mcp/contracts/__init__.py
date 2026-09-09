@@ -1,5 +1,6 @@
 """Knowledge contract definitions, DTOs, errors, constants, and protocol interfaces."""
 
+from kb_mcp.contracts.cli import CliExitCode, DryRunResultDTO
 from kb_mcp.contracts.constants import (
     ALLOWED_DOCUMENT_TYPES,
     ALLOWED_PROVENANCE_SCHEMES,
@@ -161,8 +162,10 @@ __all__ = [
     "ApprovedArtifactRecord",
     "CanonicalKnowledgeDocumentDTO",
     "ChunkDraftDTO",
+    "CliExitCode",
     "CorpusCategory",
     "DocumentStateDTO",
+    "DryRunResultDTO",
     "EmbeddedChunkDTO",
     "EmbeddingDimensionError",
     "EmbeddingError",

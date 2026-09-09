@@ -2,8 +2,13 @@
 
 import asyncio
 import math
+import os
 from collections.abc import Sequence
 from typing import Any
+
+# Prevent OpenBLAS/ONNX thread allocation exhaustion on Windows
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+os.environ.setdefault("OMP_NUM_THREADS", "1")
 
 from fastembed import TextEmbedding
 

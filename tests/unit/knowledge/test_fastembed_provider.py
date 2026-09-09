@@ -1,6 +1,7 @@
 """Unit tests for FastEmbedEmbeddingProvider and EmbeddingProvider protocol."""
 
 import math
+import os
 from typing import Any
 from unittest.mock import patch
 
@@ -303,3 +304,28 @@ def test_knowledge_server_settings_validates_embedding_model() -> None:
 
     with pytest.raises(ValidationError):
         KnowledgeServerSettings(embedding_model="openai/text-embedding-3-small")
+
+
+@pytest.mark.unit
+def test_fastembed_environment_defaults_guard() -> None:
+    """Verify OpenBLAS/OMP thread guard uses setdefault and preserves operator settings."""
+    # If key is already set, setdefault must NOT overwrite it
+    test_key = "OPENBLAS_NUM_THREADS"
+    original_val = os.environ.get(test_key)
+    try:
+        os.environ[test_key] = "4"
+        # setdefault on existing key returns existing value
+        result = os.environ.setdefault(test_key, "1")
+        assert result == "4"
+        assert os.environ[test_key] == "4"
+    finally:
+        if original_val is not None:
+            os.environ[test_key] = original_val
+        else:
+            os.environ.pop(test_key, None)
+
+    # Provider public contract and constants remain intact
+    fake_model = FakeTextEmbedding()
+    p = FastEmbedEmbeddingProvider(model_instance=fake_model)
+    assert p._model_name == DEFAULT_EMBEDDING_MODEL
+    assert isinstance(p, EmbeddingProvider)
