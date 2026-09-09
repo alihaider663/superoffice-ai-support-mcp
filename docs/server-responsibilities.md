@@ -1,203 +1,213 @@
-# MCP Server Responsibilities
+# MCP Server Responsibilities & Canonical Tool Surface
 
-## 1. SuperOffice MCP
+## 1. Overview of Platform Boundaries
+
+The platform strictly separates responsibilities across dedicated MCP servers and architectural layers. Every capability has exactly one owner service.
+
+The platform registers exactly **18 canonical public tools** at the Gateway perimeter. There are zero aliases and zero public ingestion tools.
+
+```text
+Platform Public Inventory: 18 Tools
+├── SuperOffice MCP (8 tools)
+├── Diagnostics MCP (6 tools)
+├── Knowledge MCP (3 tools)
+├── Investigation MCP (1 tool)
+└── Infrastructure MCP (0 public tools — D07 Deferred)
+```
+
+---
+
+## 2. SuperOffice MCP Server (`so-mcp`)
 
 ### Purpose
-
-Provide controlled access to SuperOffice business entities and ticket operations.
-
-### Owns
-
-* tickets
-* ticket history
-* customers
-* persons
-* companies
-* statuses
-* notes
-* replies
-* attachments
-
-### Does Not Own
-
-* infrastructure
-* Linux administration
-* database diagnostics
-* AI reasoning
-
-### Example Tools
-
-```text
-get_ticket
-search_tickets
-get_ticket_history
-get_customer
-get_person
-list_attachments
-get_attachment_metadata
-get_ticket_status
-add_ticket_note
-add_ticket_reply
-update_ticket
-```
-
----
-
-# 2. Diagnostics MCP
-
-## Purpose
-
-Provide technical evidence for application and integration investigations.
+Provides controlled, read-only access to SuperOffice CRM entities and ticket operations via the SuperOffice REST WebAPI (v1).
 
 ### Owns
+* Ticket retrieval and filtered search
+* Ticket message / communication history
+* Attachment metadata (Decision D05)
+* Company entity retrieval and lookup
+* Person / contact entity retrieval with PII masking
 
-* application logs
-* API logs
-* HTTP errors
-* timeout analysis
-* correlation analysis
-* database diagnostics
+### Does NOT Own
+* Direct database access or SQL queries
+* Diagnostic log inspection or host metrics
+* AI reasoning or prompt synthesis
+* Raw attachment downloads (deny-by-default)
+* CRM write mutations (deferred in Local Development Release 1.0)
 
-### Example Tools
+### Canonical Public Tools (8)
+1. `get_ticket`: Retrieve full ticket details by ticket ID.
+2. `search_tickets`: Filtered ticket search with strict pagination.
+3. `get_ticket_messages`: Retrieve messages / replies associated with a ticket.
+4. `list_attachments`: Retrieve attachment **metadata** only (attachment ID, filename, content type, size).
+5. `get_company`: Retrieve company details by company ID.
+6. `find_companies`: Filtered search across company records.
+7. `get_person`: Retrieve contact person details with PII masking.
+8. `find_persons`: Filtered search across person records.
 
-```text
-search_application_logs
-search_api_logs
-find_http_errors
-find_timeout_errors
-find_slow_queries
-find_deadlocks
-find_blocking_sessions
-correlate_transaction
-```
+### Operational Status
+All 8 tools are **OPERATIONAL** in local development using synthetic fixtures and mock HTTP clients.
 
 ---
 
-# 3. Knowledge MCP
+## 3. Diagnostics MCP Server (`diag-mcp`)
 
-## Purpose
-
-Provide organizational technical knowledge.
+### Purpose
+Provides technical diagnostic evidence across database health, query execution performance, deadlock history, and system logs.
 
 ### Owns
+* Microsoft SQL Server DMV diagnostic inspection
+* Slow query analysis (capped at 50 rows)
+* Deadlock graph extraction from the `system_health` Extended Events ring buffer
+* Active blocking session wait chains
+* Local IIS W3C and SuperOffice warning log parsing
 
-* documentation
-* runbooks
-* known issues
-* historical incidents
-* troubleshooting procedures
-* resolution patterns
+### Does NOT Own
+* Arbitrary SQL query execution
+* Database DDL or schema alterations
+* DML mutations (`INSERT`, `UPDATE`, `DELETE`)
+* General filesystem browsing outside configured log roots
+* Direct SuperOffice business data logic
 
-### Example Tools
+### Canonical Public Tools (6)
+1. `get_database_health`: Returns SQL Server DMV health metrics, CPU utilization, and database status.
+2. `find_slow_queries`: Returns top slow queries ordered by worker time / elapsed time (hard ceiling: 50 rows, 5s timeout).
+3. `find_deadlocks`: Parses and returns deadlock graphs from the ring buffer.
+4. `find_blocking_sessions`: Analyzes active blocking chains and waiting sessions.
+5. `search_logs`: Searches local IIS W3C access logs and SuperOffice warning logs.
+6. `get_ticket_diagnostic_record`: Correlates ticket IDs with database diagnostic records.
 
-```text
-search_knowledge
-get_runbook
-find_known_issue
-search_previous_incidents
-get_resolution_pattern
-```
+### Operational Status
+- `get_database_health`, `find_slow_queries`, `find_deadlocks`, `find_blocking_sessions`: **OPERATIONAL** (live local SQL Server or mock repository).
+- `search_logs`: **IMPLEMENTED / CONFIGURATION-CONDITIONAL** (operational when valid log root directory is configured; fails closed if enabled source fails).
+- `get_ticket_diagnostic_record`: **REGISTERED / BLOCKED** (fails closed with `DIAGNOSTIC_SCHEMA_NOT_CONFIGURED` pending DBA table schema verification).
 
 ---
 
-# 4. Infrastructure MCP
+## 4. Knowledge MCP Server (`kb-mcp`)
 
-## Purpose
-
-Provide controlled infrastructure diagnostics.
+### Purpose
+Provides semantic search and structured retrieval across technical documentation, operational runbooks, and verified known issues.
 
 ### Owns
+* Vector search across documentation chunks in PostgreSQL + `pgvector`
+* Structured runbook retrieval by unique identifier
+* Known issue and incident pattern semantic lookup
+* Internal offline ingestion pipeline and operator CLI
 
-* server health
-* service health
-* CPU
-* memory
-* disk
-* endpoint health
-* load balancer health
-* network connectivity
+### Does NOT Own
+* Public or unauthenticated ingestion tools (0 public ingestion tools)
+* Customer CRM data or live ticket storage (Decision D08)
+* Direct access to SuperOffice REST APIs or MSSQL databases
 
-### Example Tools
+### Canonical Public Tools (3)
+1. `search_knowledge`: Semantic vector search across technical documentation chunks (BAAI/bge-small-en-v1.5 embeddings).
+2. `get_runbook`: Retrieves a structured operational runbook (steps, prerequisites, rollback) by ID.
+3. `find_known_issues`: Semantic search across known issues, symptoms, root causes, and workarounds.
 
-```text
-get_server_health
-get_cpu_usage
-get_memory_usage
-get_disk_usage
-get_service_status
-check_endpoint
-test_tcp_connection
-check_load_balancer
-get_node_health
-```
+### Operational Status
+All 3 tools are **CONFIGURED / LOCAL OPERATIONAL** against the local PostgreSQL `superoffice_ai_knowledge` database.
 
 ---
 
-# 5. Gateway
+## 5. Investigation MCP Server (`investigation-mcp`)
 
-## Purpose
-
-Security and access-control boundary.
+### Purpose
+Dedicated FastMCP microservice runtime (port 8005) hosting composite incident investigation workflows (ADR 012).
 
 ### Owns
+* Composite incident investigation orchestration
+* Layer-3 investigation state machine (`IncidentInvestigationStateMachine`)
+* Request-scoped evidence aggregation and timeline building
+* Hypothesis evaluation and confidence scoring
+* Subordinate Streamable HTTP client dispatch to `so-mcp` and `diag-mcp`
 
-* authentication
-* authorization
-* RBAC
-* tool permissions
-* rate limiting
-* audit correlation
-* security policies
-* output filtering
+### Does NOT Own
+* Gateway security responsibilities (auth, RBAC, rate limiting)
+* Direct database drivers or SQL connections
+* Direct external network calls
+* Durable cross-request persistence
 
-The Gateway does not own SuperOffice business logic.
+### Canonical Public Tool (1)
+1. `investigate_incident`: Orchestrates incident investigation using exactly 4 subordinate operations.
 
----
-
-# 6. Application Services
-
-## Purpose
-
-Implement cross-system business workflows.
-
-Examples:
-
-```text
-Ticket Investigation
-Incident Correlation
-Attachment Processing
-Knowledge Retrieval
-Root Cause Analysis Support
-```
-
-Application services may orchestrate multiple MCP/integration capabilities but must not contain protocol-specific logic unnecessarily.
+### Subordinate Composition & Evidence Status
+- **Subordinate Operations (Exactly 4)**:
+  1. `get_ticket` (`so-mcp`)
+  2. `get_database_health` (`diag-mcp`)
+  3. `find_slow_queries` (`diag-mcp`)
+  4. `find_deadlocks` (`diag-mcp`)
+- **Prohibited Subordinate Calls**: No calls to `search_tickets`, `find_blocking_sessions`, `search_logs`, or Knowledge MCP tools.
+- **Evidence Collector Outcomes**:
+  - `application_logs`: Returns `EvidenceOutcome.BLOCKED` (zero synthetic or fabricated log evidence).
+  - `knowledge_base`: Returns `EvidenceOutcome.NOT_CONFIGURED` (zero synthetic or fabricated runbook evidence).
 
 ---
 
-# 7. Integration Clients
+## 6. Infrastructure MCP Server (`infra-mcp`)
 
-## Purpose
+### Purpose
+Structural server boundary reserved for controlled host and OS-level diagnostics.
 
-Communicate with external systems.
+### Canonical Public Tools (0)
+- **0 public tools**.
+- Implementation of detailed adapter contracts is **DEFERRED** under Decision `D07`.
 
-Examples:
+### Candidate Future Probes (Roadmap)
+- Host resource metrics (CPU load, memory pressure, disk volume space)
+- IIS application pool status
+- Windows service operational state
 
-```text
-SuperOffice API Client
-MSSQL Client
-Logging Client
-Infrastructure Client
-Supabase Client
-```
-
-Integration clients must be isolated behind interfaces so they can be mocked during testing.
+### Strict Prohibitions
+- **NO arbitrary shell execution** (no cmd.exe, PowerShell, bash, or exec primitives).
+- **NO general filesystem access** or directory navigation.
+- **NO network scanning**, ping sweeps, or arbitrary socket connections.
 
 ---
 
-# Ownership Rule
+## 7. MCP Gateway (`platform-gateway`)
 
-Every capability must have one clear owner.
+### Purpose
+Central security perimeter, caller authentication, RBAC policy enforcement, and Streamable HTTP protocol router.
 
-Do not duplicate the same external-system logic across MCP servers.
+### Gateway Owns
+* JWT Bearer token validation and claims extraction
+* Caller identity (`sub`), assigned role (`role`), and privilege flags (`production_write`, `attachment_access`)
+* Declarative YAML RBAC policy evaluation (`tool_permissions.yaml`) under strict deny-by-default
+* Per-identity and per-tool sliding-window rate limiting
+* Correlation ID generation and propagation (`X-Correlation-ID`)
+* Structured JSON audit logging of all allowed and denied tool invocations
+* Streamable HTTP protocol routing to backend MCP servers
+* Recursive output sanitization and PII scrubbing before returning responses to AI clients
 
-If a capability crosses multiple domains, place orchestration in the application/service layer rather than creating cross-domain MCP servers.
+### Gateway Does NOT Own
+* SuperOffice business logic or entity transformations
+* AI reasoning, prompt engineering, or LLM interaction
+* Direct database connections (zero database drivers imported)
+* JWT issuance (handled by external Identity Providers)
+* Durable application state or session storage
+
+---
+
+## 8. Application Services (Layer 4)
+
+### Purpose
+Implements multi-source business workflows across integration clients:
+* Ticket investigation service (`InvestigationApplicationService`)
+* Knowledge retrieval service (`KnowledgeApplicationService`)
+* Diagnostics application service (`DiagnosticsApplicationService`)
+
+Application services operate behind interfaces, allowing complete isolation from protocol transport layers and full offline testability.
+
+---
+
+## 9. Integration Clients (Layer 5)
+
+### Purpose
+Encapsulates low-level communication with external backend systems:
+* `SuperOfficeRestClient`: Async HTTP client with connection pooling, retries, and timeout guards.
+* `MssqlRepository`: Async SQLAlchemy connection pool over Microsoft ODBC Driver 18 (`aioodbc`).
+* `KnowledgePostgresRepository`: Async connection pool over PostgreSQL (`asyncpg`).
+
+Integration clients must be completely isolated behind abstract domain interfaces and never called directly from MCP tool decorators without passing through application services.

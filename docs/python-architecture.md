@@ -8,7 +8,7 @@
 
 ## 1. Executive Summary & Core Architectural Tenets
 
-The **SuperOffice AI Support MCP Platform** is an enterprise-grade AI-assisted diagnostic, support, and investigation system. It bridges LLM reasoning engines (Claude Desktop, Cursor, Antigravity, and backend AI agents) with Onsite SuperOffice CRM, MS SQL Database clusters, Supabase knowledge stores, and infrastructure diagnostics.
+The **SuperOffice AI Support MCP Platform** is an enterprise-grade AI-assisted diagnostic, support, and investigation system. It bridges LLM reasoning engines (Claude Desktop, Cursor, Antigravity, and backend AI agents) with Onsite SuperOffice CRM, MS SQL Database clusters, PostgreSQL + pgvector knowledge stores, and infrastructure diagnostics.
 
 ### Core Architecture Tenets:
 1. **Mandatory Streamable HTTP Transport (ADR 007)**: In strict adherence to ADR 007, Streamable HTTP is the mandatory protocol transport for all MCP interactions. All stdio and legacy SSE ambiguities are eliminated.
@@ -31,7 +31,7 @@ The **SuperOffice AI Support MCP Platform** is an enterprise-grade AI-assisted d
 | **Async HTTP Client** | **HTTPX** | `~=0.28.0` | Enterprise-grade async HTTP/1.1 and HTTP/2 client with connection pooling, custom transport hooks, timeout guards, and SSL verification controls. |
 | **Async MSSQL Layer** | **SQLAlchemy 2.0 Async + `aioodbc`** | `sqlalchemy[asyncio]~=2.0.38`<br/>`aioodbc~=0.5.0` | Enterprise async connection pooling, statement timeouts, parameterized query enforcement, and native binding over Microsoft ODBC Driver 18. |
 | **ODBC Driver** | **Microsoft ODBC Driver 18** | `18.x` (Host/System) | Microsoft's official high-performance driver supporting TLS 1.3 encryption, NTLM/Kerberos/SQL auth, and robust connection health verification. |
-| **Knowledge Store** | **`supabase-py` / `postgrest`** | `~=2.11.0` | Managed async vector search and documentation indexing for RAG within the Knowledge MCP boundary. |
+| **Knowledge Store** | **PostgreSQL + `pgvector` (`asyncpg`)** | `pgvector~=0.3.6`<br/>`asyncpg~=0.30.0` | Implemented in Phase 7: Dedicated PostgreSQL vector database (`superoffice_ai_knowledge`), schema `knowledge`, and local FastEmbed embeddings (`BAAI/bge-small-en-v1.5`). (Supabase was an early Phase 1B evaluation candidate superseded in Phase 7). |
 | **Structured Logging** | **`structlog`** | `~=24.4.0` | High-performance contextual structured JSON logging to `stderr`, correlation ID injection, and automatic credential/PII scrubbing processors. |
 | **Test Framework** | **`pytest` + `pytest-asyncio`** | `pytest~=8.3.0`<br/>`pytest-asyncio~=0.25.0` | Async testing harness, fixture lifecycle isolation, parametrized contract tests, and high-coverage mocking utilities. |
 | **Code Quality & Linter** | **`ruff`** | `~=0.9.0` | Ultra-fast linter and formatter replacing Flake8, Black, isort, and pyupgrade in a single tool. |

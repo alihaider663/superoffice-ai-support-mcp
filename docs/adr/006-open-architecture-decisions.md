@@ -223,48 +223,34 @@ HIGH — Affects whether an external AI provider can be used at all for investig
 
 ---
 
-## Open Decision 12 — Knowledge Store Technology
+## Decision 12 — Knowledge Store Technology (RESOLVED)
 
-### Question
+**Status**: Resolved in Phase 7.
 
-Is Supabase/pgvector confirmed as the knowledge store, or is it still under evaluation?
-
-### Considerations
-
-- The project requirements say "Supabase/pgvector **may** be used for knowledge retrieval" (emphasis on "may").
-- The architecture diagram includes Supabase as an external system.
-- The integration clients include a "Supabase Client."
-- The phrasing suggests this is a candidate, not a confirmed decision.
-
-### Impact
-
-LOW — Affects Knowledge MCP implementation but not overall architecture.
+### Resolution Summary
+Direct PostgreSQL with the `pgvector` extension (version 0.8.6) in database `superoffice_ai_knowledge` and schema `knowledge` was selected, implemented, and verified for Knowledge storage and semantic retrieval, using `FastEmbedEmbeddingProvider` (`BAAI/bge-small-en-v1.5`, 384 dimensions). The early Supabase candidate was superseded by direct PostgreSQL + pgvector.
 
 ---
 
-## Open Decision 13 — Error Handling and Resilience Strategy
+## Decision 13 — Error Handling and Resilience Strategy (RESOLVED)
 
-### Question
+**Status**: Resolved in Phase 1B / Phase 2B.
 
-What is the unified error-handling and resilience strategy across MCP servers?
-
-### Considerations
-
-- The architecture mentions "timeouts," "retries where safe," and "circuit breakers where appropriate."
-- The add-mcp-tool workflow specifies typed errors and safe diagnostic information.
-- No document specifies a consistent error taxonomy, retry policy, or circuit-breaker configuration.
-- Different external systems (SuperOffice API, MSSQL, Supabase) may have different failure modes.
-
-### Impact
-
-MEDIUM — Affects reliability and the AI agent's ability to interpret failures.
+### Resolution Summary
+Unified error taxonomy implemented in `platform_core.errors` (`PlatformBaseError`, `AuthenticationError`, `AuthorizationError`, `RateLimitError`, `UpstreamServiceError`, `NotFoundError`, etc.) with fail-fast validation, typed error codes, and safe client sanitization.
 
 ---
 
-## Next Steps
+## Authoritative Architecture Decision Ledger (D01–D09)
 
-Decisions 1–4 are resolved in ADRs 007–010. Remaining open decisions (5–13) should be resolved iteratively:
+Note: For the authoritative, current decision ledger governing the platform's runtime constraints, see **`docs/project-status.md`** (Decisions D01 through D09):
+- **D01**: Diagnostics MSSQL statement query timeout = 5.0 seconds (RESOLVED)
+- **D02**: Diagnostics MSSQL maximum result rows = 50 rows (RESOLVED)
+- **D03**: Declarative YAML tool-level RBAC (RESOLVED)
+- **D04**: Attachment MD5 metadata discrepancy (OPEN / NON-BLOCKING)
+- **D05**: Attachment authorization & deny-by-default (RESOLVED / ENFORCED)
+- **D06**: stdout/stderr documentation normalization (NON-BLOCKING)
+- **D07**: Infrastructure detailed adapter contracts (DEFERRED)
+- **D08**: External AI / sensitive production CRM boundary (OPEN / ENFORCED)
+- **D09**: Diagnostics MSSQL transaction isolation = SNAPSHOT (RESOLVED / APPROVED)
 
-1. **Phase 0.5 (Completed)**: Decisions 1 (Transport -> ADR 007), 2 (Gateway -> ADR 008), 3 (Authentication -> ADR 009), 4 (RBAC -> ADR 010).
-2. **During Phase 1**: Decisions 5 (Deployment), 6 (Secrets), 13 (Error handling).
-3. **Before production**: Decisions 7 (Scanning), 8 (Audit storage), 9 (Observability), 10 (Isolation), 11 (AI boundary), 12 (Knowledge store).
