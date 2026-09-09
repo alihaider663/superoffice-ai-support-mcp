@@ -48,6 +48,17 @@ from kb_mcp.ingestion.parsers import (
 from kb_mcp.ingestion.sanitizer import KnowledgeSanitizer, is_safe_placeholder
 from kb_mcp.ingestion.service import KnowledgeAdmissionService
 
+
+def _synthetic_provider_key_a() -> str:
+    """Constructs synthetic provider test key at runtime from non-detector fragments."""
+    return "sk" + "_live_" + "1234567890abcdef" + "1234567890abcdef"
+
+
+def _synthetic_provider_key_b() -> str:
+    """Constructs synthetic provider test key at runtime from non-detector fragments."""
+    return "sk" + "_live_" + "1234567890abcdef" + "1234567890"
+
+
 # ============================================================================
 # 1. Corpus Eligibility Tests (D05 / D08 / Bounds)
 # ============================================================================
@@ -251,7 +262,7 @@ class TestKnowledgeSanitizerSecrets:
         assert err == AdmissionReasonCode.SECRET_DETECTED
 
     def test_detects_known_api_key_prefixes(self, sanitizer: KnowledgeSanitizer) -> None:
-        sk = "sk" + "_live_" + "1234567890abcdef1234567890abcdef"
+        sk = _synthetic_provider_key_a()
         assert sanitizer.contains_secret(sk)
         ghp = "ghp_1234567890abcdef1234567890abcdef"
         assert sanitizer.contains_secret(ghp)
@@ -346,7 +357,7 @@ class TestKnowledgeSanitizerPII:
             == AdmissionReasonCode.PII_DETECTED
         )
         assert (
-            sanitizer.check_identity_field("sk" + "_live_" + "1234567890abcdef1234567890", "product")
+            sanitizer.check_identity_field(_synthetic_provider_key_b(), "product")
             == AdmissionReasonCode.SECRET_DETECTED
         )
         assert sanitizer.check_identity_field("rb-crm-001", "runbook_id") is None
@@ -576,7 +587,7 @@ class TestAdmissionService:
                 "diagnostic_steps": ["Step 1"],
                 "remediation_steps": ["Step 2"],
                 "source_reference": "runbook://ops/iis-01",
-                "product": "sk" + "_live_" + "1234567890abcdef1234567890abcdef",
+                "product": _synthetic_provider_key_a(),
             }
         ).encode("utf-8")
         source = AdmissionSourceInputDTO(
@@ -1086,7 +1097,7 @@ class TestStructuredIdentityIntegrity:
                 "issue_id": "ki-cat-02",
                 "title": "Clean Title",
                 "symptom_summary": "Clean Symptom",
-                "category": "sk" + "_live_" + "1234567890abcdef1234567890abcdef",
+                "category": _synthetic_provider_key_a(),
                 "source_reference": "known-issue://kb/cat-02",
             }
         ).encode("utf-8")
@@ -1130,7 +1141,7 @@ class TestStructuredIdentityIntegrity:
                 "issue_id": "ki-prod-01",
                 "title": "Clean Title",
                 "symptom_summary": "Clean Symptom",
-                "affected_products": ["sk" + "_live_" + "1234567890abcdef1234567890abcdef"],
+                "affected_products": [_synthetic_provider_key_a()],
                 "source_reference": "known-issue://kb/prod-01",
             }
         ).encode("utf-8")
