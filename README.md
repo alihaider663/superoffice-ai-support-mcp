@@ -167,6 +167,6 @@ The local development setup incorporates specific exceptions that must be replac
 
 ## Roadmap
 
-- **FLC.4**: Local Development Release 1.0 Checkpoint & Git Tag.
+- **FLC.4**: Local Development Release 1.0 Checkpoint & Git Tag (`COMPLETE / APPROVED` — `v1.0.0-local.1`).
 - **FLC.5**: Repository Professionalization & Remote Publication (Git history audit, private repo push).
 - **PR.0–PR.12**: Production Readiness Program (Production deployment, containerization, PKI, network policies, HA/DR, and operational acceptance).

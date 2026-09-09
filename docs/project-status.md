@@ -3,16 +3,19 @@
 **Project:** SuperOffice AI Support MCP Platform  
 **Authoritative Repository:** `F:\superoffice-ai-support-mcp`  
 **Implementation Baseline Before FLC.3 Documentation:** `ef009689980d5586e23029d6ed2d31840e6a34f7`  
-**Short Baseline:** `ef00968` (`feat: add local Knowledge ingestion CLI`)  
+**FLC.3 Documentation Checkpoint:** `bc070d62fddec52ecdb4765ecbfa2494a423167f`  
 **Release Target:** `Local Development Release 1.0`  
-**Current Release Status:** `IMPLEMENTATION COMPLETE AT LOCAL DEVELOPMENT SCOPE` — `FINAL CLOSURE IN PROGRESS`  
+**Release Identifier:** `v1.0.0-local.1`  
+**Current Release Status:** `LOCAL DEVELOPMENT RELEASE 1.0 COMPLETE / APPROVED`  
 **Completed Closure Gates:**  
 - **FLC.1 — Gateway → Knowledge E2E:** `COMPLETE / APPROVED`  
 - **FLC.2 — Full Local Platform Regression & Security Review:** `COMPLETE / APPROVED`  
-**Current Closure Stage:** `FLC.3 — Decision Ledger / Deferred Items / Documentation Reconciliation` (`CURRENT`)  
-**Next Gate:** `FLC.4 — Local Development Release 1.0 Checkpoint & Tag` (`NOT STARTED`)  
+- **FLC.3 — Decision Ledger / Deferred Items / Documentation Reconciliation:** `COMPLETE / APPROVED / CHECKPOINTED`  
+- **FLC.4 — Local Development Release 1.0 Checkpoint & Tag:** `COMPLETE / APPROVED`  
+**Next Gate:** `FLC.5 — Repository Professionalization & Remote Publication` (`NOT STARTED`)  
 **Production Ready:** `NO`  
 **Production Deployment / Network Trust:** `NOT STARTED`  
+**Production Readiness Program:** `FUTURE / NOT STARTED`  
 
 ---
 
@@ -52,8 +55,8 @@ The **SuperOffice AI Support MCP Platform** is an enterprise-grade AI-assisted d
 | **7D.5E** | Internal operator CLI (`dry-run`, `ingest`) & full local ingestion E2E | `COMPLETE / APPROVED` |
 | **FLC.1** | Gateway → Knowledge E2E verification (Client → Gateway → Knowledge → DB) | `COMPLETE / APPROVED` |
 | **FLC.2** | Full local platform regression & security review (1043 passed, 11 skipped) | `COMPLETE / APPROVED` |
-| **FLC.3** | Decision Ledger, Deferred Items & Documentation Reconciliation | `CURRENT` |
-| **FLC.4** | Local Development Release 1.0 Checkpoint & Tag | `NOT STARTED` |
+| **FLC.3** | Decision Ledger, Deferred Items & Documentation Reconciliation | `COMPLETE / APPROVED / CHECKPOINTED` |
+| **FLC.4** | Local Development Release 1.0 Checkpoint & Tag | `COMPLETE / APPROVED` |
 | **FLC.5** | Repository Professionalization & Remote Publication | `NOT STARTED` |
 | **PR.0–PR.12** | Production Readiness Program | `FUTURE / NOT STARTED` |
 
@@ -526,7 +529,7 @@ To prevent any misunderstanding of the platform's operational readiness, the fol
 Following the completion of Local Development Release 1.0, the project will progress through the following planned stages:
 
 ### Immediate Local Release Track
-- **FLC.4 — Local Development Release 1.0 Checkpoint & Tag** (`NOT STARTED`): Formal repository tag and baseline lock.
+- **FLC.4 — Local Development Release 1.0 Checkpoint & Tag** (`COMPLETE / APPROVED`): Formal repository tag (`v1.0.0-local.1`) and baseline lock.
 - **FLC.5 — Repository Professionalization & Remote Publication** (`NOT STARTED`):
   - Repository cleanup, Git history secret audit, README polish.
   - License determination, `SECURITY.md`, `CONTRIBUTING.md`, `CODEOWNERS`.
