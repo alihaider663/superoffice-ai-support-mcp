@@ -10,6 +10,9 @@ from diag_mcp.contracts.dtos import (
     BlockingSessionCriteriaDTO,
     BlockingSessionDomainDTO,
     BoundedDiagnosticResultDTO,
+    DatabaseBackupStatusDTO,
+    DatabaseConnectivityDTO,
+    DatabaseConnectivityState,
     DatabaseHealthDomainDTO,
     DeadlockCriteriaDTO,
     DeadlockDomainDTO,
@@ -29,6 +32,8 @@ from diag_mcp.contracts.interfaces import (
     DiagnosticRepository,
     LogSearchClient,
 )
+from diag_mcp.server import create_diagnostics_mcp_server
+from platform_gateway.schemas import get_tool_schema_map
 from tests.fakes.fake_diagnostic_repository import FakeDiagnosticRepository
 from tests.fakes.fake_log_search_client import FakeLogSearchClient
 
@@ -51,6 +56,137 @@ def test_database_health_dto_valid() -> None:
     assert health.status_summary == "ONLINE"
     assert health.active_connections == 25
     assert health.latency_ms == 2.4
+    assert health.backup_status is None
+    assert health.connectivity is None
+
+
+def test_database_connectivity_dto_contract() -> None:
+    """Verify DatabaseConnectivityDTO initialization, states, immutability, and serialization."""
+    approved_states: list[DatabaseConnectivityState] = [
+        "CONNECTED",
+        "DNS_RESOLUTION_FAILURE",
+        "TCP_CONNECTIVITY_FAILURE",
+        "TCP_CONNECTIVITY_TIMEOUT",
+        "DATABASE_AUTHENTICATION_FAILURE",
+        "DATABASE_CONNECTION_FAILURE",
+        "DATABASE_CONNECTION_TIMEOUT",
+        "DATABASE_QUERY_FAILURE",
+        "DATABASE_QUERY_TIMEOUT",
+        "UNKNOWN",
+    ]
+    for st in approved_states:
+        conn = DatabaseConnectivityDTO(state=st, observed_failure="Factual observed boundary")
+        assert conn.state == st
+        assert conn.observed_failure == "Factual observed boundary"
+
+    # Connected state with None failure
+    connected = DatabaseConnectivityDTO(state="CONNECTED", observed_failure=None)
+    assert connected.state == "CONNECTED"
+    assert connected.observed_failure is None
+
+    # Frozen immutability check
+    with pytest.raises(ValidationError):
+        connected.state = "UNKNOWN"
+
+    # Extra forbid check
+    with pytest.raises(ValidationError):
+        DatabaseConnectivityDTO.model_validate(
+            {
+                "state": "CONNECTED",
+                "extra_field": 123,
+            }
+        )
+
+    # Unapproved state check
+    with pytest.raises(ValidationError):
+        DatabaseConnectivityDTO.model_validate(
+            {
+                "state": "INVALID_STATE",
+            }
+        )
+
+    # Embedded in DatabaseHealthDomainDTO serialization
+    now = datetime.now(UTC)
+    health = DatabaseHealthDomainDTO(
+        is_healthy=True,
+        status_summary="ONLINE",
+        active_connections=5,
+        latency_ms=1.1,
+        collected_at=now,
+        connectivity=connected,
+    )
+    dumped = health.model_dump(mode="json")
+    assert "connectivity" in dumped
+    assert dumped["connectivity"]["state"] == "CONNECTED"
+    assert dumped["connectivity"]["observed_failure"] is None
+
+
+def test_database_backup_status_dto_valid() -> None:
+    """Verify DatabaseBackupStatusDTO initialization, serialization, and constraints."""
+    recorded_time = datetime(2026, 9, 10, 8, 30, 0)
+    backup_status = DatabaseBackupStatusDTO(
+        backup_found=True,
+        latest_backup_at=recorded_time,
+        latest_backup_type="FULL",
+        latest_full_backup_at=recorded_time,
+        latest_differential_backup_at=None,
+        latest_log_backup_at=None,
+        status="AVAILABLE",
+        error_message=None,
+    )
+    assert backup_status.backup_found is True
+    assert backup_status.latest_backup_at == recorded_time
+    assert backup_status.latest_backup_at.tzinfo is None
+    assert backup_status.latest_backup_type == "FULL"
+    assert backup_status.latest_full_backup_at == recorded_time
+    assert backup_status.status == "AVAILABLE"
+
+    # Verify JSON serialization has no trailing Z (SQL Server recorded time)
+    dumped = backup_status.model_dump(mode="json")
+    assert dumped["latest_backup_at"] == "2026-09-10T08:30:00"
+    assert not dumped["latest_backup_at"].endswith("Z")
+
+    # Frozen immutability check
+    with pytest.raises(ValidationError):
+        backup_status.backup_found = False
+
+    # Extra forbid check
+    with pytest.raises(ValidationError):
+        DatabaseBackupStatusDTO.model_validate(
+            {
+                "backup_found": True,
+                "unauthorized_field": 123,
+            }
+        )
+
+
+def test_database_health_dto_with_backup_status() -> None:
+    """Verify DatabaseHealthDomainDTO correctly embeds and serializes DatabaseBackupStatusDTO."""
+    now = datetime.now(UTC)
+    backup_status = DatabaseBackupStatusDTO(
+        backup_found=False,
+        latest_backup_at=None,
+        latest_backup_type=None,
+        latest_full_backup_at=None,
+        latest_differential_backup_at=None,
+        latest_log_backup_at=None,
+        status="AVAILABLE",
+    )
+    health = DatabaseHealthDomainDTO(
+        is_healthy=True,
+        status_summary="ONLINE",
+        active_connections=10,
+        latency_ms=1.2,
+        collected_at=now,
+        backup_status=backup_status,
+    )
+    assert health.backup_status is not None
+    assert health.backup_status.backup_found is False
+
+    dumped = health.model_dump(mode="json")
+    assert "backup_status" in dumped
+    assert dumped["backup_status"]["backup_found"] is False
+    assert dumped["backup_status"]["status"] == "AVAILABLE"
 
 
 def test_dto_immutability_and_extra_forbid() -> None:
@@ -387,3 +523,98 @@ def test_fake_log_search_filtering_and_bounding() -> None:
             await fake.search_logs(LogSearchCriteriaDTO())
 
     asyncio.run(_run_async())
+
+
+# ============================================================================
+# Diagnostics Evidence Discipline Contract Tests
+# ============================================================================
+
+
+def test_database_health_tool_description_evidence_discipline() -> None:
+    """Verify get_database_health descriptions enforce evidence discipline in MCP and Gateway."""
+    # 1. Gateway public schema
+    gateway_tools = get_tool_schema_map()
+    assert "get_database_health" in gateway_tools
+    gw_desc = gateway_tools["get_database_health"].description
+    assert gw_desc is not None
+
+    # 2. Server tool definition
+    server = create_diagnostics_mcp_server()
+    srv_tool = server._tool_manager.get_tool("get_database_health")
+    assert srv_tool is not None
+    srv_desc = srv_tool.description
+    assert srv_desc is not None
+
+    for desc in (gw_desc, srv_desc):
+        assert "point-in-time" in desc.lower() or "current" in desc.lower()
+        assert "not invalidate" in desc.lower()
+        assert "unknown" in desc.lower()
+        assert "latency_ms" in desc
+        assert "not by itself prove" in desc.lower()
+        assert "do not recommend" in desc.lower()
+
+
+def test_backup_status_dto_descriptions_evidence_discipline() -> None:
+    """Verify DatabaseBackupStatusDTO field descriptions mandate timezone and SLA discipline."""
+    fields = DatabaseBackupStatusDTO.model_fields
+
+    # status=AVAILABLE means inspection succeeded, NOT healthy/fresh/SLA compliant
+    status_desc = fields["status"].description or ""
+    assert "inspection succeeded" in status_desc
+    assert "not mean" in status_desc.lower()
+    assert "freshness sla" in status_desc.lower()
+
+    # Timezone unasserted: clients must NOT append Z or label UTC
+    for ts_field in (
+        "latest_backup_at",
+        "latest_full_backup_at",
+        "latest_differential_backup_at",
+        "latest_log_backup_at",
+    ):
+        desc = fields[ts_field].description or ""
+        assert "TIMEZONE IS UNASSERTED" in desc
+        assert "MUST NOT append 'Z'" in desc
+        assert "label as UTC" in desc
+
+    # error_message=null does not imply physical verification
+    err_desc = fields["error_message"].description or ""
+    assert "physical backup file verification" in err_desc
+
+
+def test_blocking_deadlock_and_slow_query_tool_descriptions_evidence_discipline() -> None:
+    """Verify blocking, deadlock, and slow query descriptions prevent over-interpretation."""
+    gateway_tools = get_tool_schema_map()
+    server = create_diagnostics_mcp_server()
+
+    # Blocking: snapshot only, 0 does not prove no blocking before snapshot
+    gw_blocking = gateway_tools["find_blocking_sessions"].description
+    assert gw_blocking is not None
+    srv_blocking_tool = server._tool_manager.get_tool("find_blocking_sessions")
+    assert srv_blocking_tool is not None
+    srv_blocking = srv_blocking_tool.description
+    assert srv_blocking is not None
+    for desc in (gw_blocking, srv_blocking):
+        assert "snapshot" in desc.lower()
+        assert "not prove absence of blocking prior" in desc.lower()
+
+    # Deadlocks: windowed capture only, 0 does not prove historical absence outside window
+    gw_deadlock = gateway_tools["find_deadlocks"].description
+    assert gw_deadlock is not None
+    srv_deadlock_tool = server._tool_manager.get_tool("find_deadlocks")
+    assert srv_deadlock_tool is not None
+    srv_deadlock = srv_deadlock_tool.description
+    assert srv_deadlock is not None
+    for desc in (gw_deadlock, srv_deadlock):
+        assert "queried time window" in desc.lower() or "window" in desc.lower()
+        assert "not prove historical absence" in desc.lower()
+
+    # Slow queries: plan cache aggregated historical averages, not real-time query executions
+    gw_slow = gateway_tools["find_slow_queries"].description
+    assert gw_slow is not None
+    srv_slow_tool = server._tool_manager.get_tool("find_slow_queries")
+    assert srv_slow_tool is not None
+    srv_slow = srv_slow_tool.description
+    assert srv_slow is not None
+    for desc in (gw_slow, srv_slow):
+        assert "plan cache" in desc.lower()
+        assert "aggregated" in desc.lower() or "averages" in desc.lower()

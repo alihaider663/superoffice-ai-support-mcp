@@ -6,6 +6,8 @@ from diag_mcp.contracts.dtos import (
     BlockingSessionCriteriaDTO,
     BlockingSessionDomainDTO,
     BoundedDiagnosticResultDTO,
+    DatabaseBackupStatusDTO,
+    DatabaseConnectivityDTO,
     DatabaseHealthDomainDTO,
     DeadlockCriteriaDTO,
     DeadlockDomainDTO,
@@ -21,12 +23,27 @@ class FakeDiagnosticRepository:
     """Deterministic in-memory implementation of DiagnosticRepository Protocol."""
 
     def __init__(self) -> None:
+        now = datetime.now(UTC)
+        backup_time = datetime(2026, 9, 10, 8, 30, 0)
         self._health: DatabaseHealthDomainDTO = DatabaseHealthDomainDTO(
             is_healthy=True,
             status_summary="ONLINE",
             active_connections=12,
             latency_ms=1.5,
-            collected_at=datetime.now(UTC),
+            collected_at=now,
+            backup_status=DatabaseBackupStatusDTO(
+                backup_found=True,
+                latest_backup_at=backup_time,
+                latest_backup_type="FULL",
+                latest_full_backup_at=backup_time,
+                latest_differential_backup_at=None,
+                latest_log_backup_at=None,
+                status="AVAILABLE",
+            ),
+            connectivity=DatabaseConnectivityDTO(
+                state="CONNECTED",
+                observed_failure=None,
+            ),
         )
         self._slow_queries: list[SlowQueryDomainDTO] = []
         self._deadlocks: list[DeadlockDomainDTO] = []

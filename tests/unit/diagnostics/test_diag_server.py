@@ -39,6 +39,7 @@ def test_diag_server_mcp_endpoint_invocation() -> None:
         )
         assert res.status_code == 200
         assert "is_healthy" in res.text
+        assert "backup_status" in res.text
 
 
 def test_diag_server_dns_rebinding_protection() -> None:

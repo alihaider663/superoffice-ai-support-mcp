@@ -648,7 +648,18 @@ def get_platform_tool_schemas() -> list[Tool]:
         # Diagnostics MCP Tools (L2 & L3)
         Tool(
             name="get_database_health",
-            description="Basic database cluster health diagnostics",
+            description=(
+                "Current point-in-time observation of database cluster health, active "
+                "connections, backup history, and connectivity boundary. A CONNECTED state "
+                "proves database reachability at collection time only; it does NOT "
+                "invalidate or disprove previously observed failures. Historical root cause "
+                "remains UNKNOWN unless separate historical evidence proves it. latency_ms "
+                "is an observational diagnostic measurement for this specific query and does "
+                "NOT by itself prove client timeout, SQL saturation, VPN/firewall failure, "
+                "connection pool exhaustion, or outage cause. Do not recommend changing "
+                "connection timeouts, firewall, VPN, or database network configurations "
+                "without concrete supporting evidence."
+            ),
             inputSchema={
                 "type": "object",
                 "properties": {},
@@ -656,7 +667,11 @@ def get_platform_tool_schemas() -> list[Tool]:
         ),
         Tool(
             name="find_slow_queries",
-            description="Inspect slow query execution records",
+            description=(
+                "Inspect slow query execution records from the SQL Server plan cache "
+                "(sys.dm_exec_query_stats). Metrics represent cached and aggregated historical "
+                "averages per execution, not proof of query execution at the exact current moment."
+            ),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -708,7 +723,12 @@ def get_platform_tool_schemas() -> list[Tool]:
         ),
         Tool(
             name="find_deadlocks",
-            description="Analyze SQL Server deadlock graphs and events",
+            description=(
+                "Query deadlock events captured in the SQL Server system_health ring buffer within "
+                "the queried time window (hours_back, default 24). Zero returned deadlocks means "
+                "only that none were captured within that specific window; it does NOT prove "
+                "historical absence outside that window or absence of other contention."
+            ),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -727,7 +747,11 @@ def get_platform_tool_schemas() -> list[Tool]:
         ),
         Tool(
             name="find_blocking_sessions",
-            description="Analyze SQL Server blocking transactions",
+            description=(
+                "Real-time snapshot of active SQL Server blocking transactions. Zero current "
+                "blocking sessions means no blocking sessions were observed at the exact moment "
+                "of this snapshot; it does NOT prove absence of blocking prior to the snapshot."
+            ),
             inputSchema={
                 "type": "object",
                 "properties": {},

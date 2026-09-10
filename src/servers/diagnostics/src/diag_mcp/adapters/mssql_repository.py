@@ -1,6 +1,10 @@
 """Microsoft SQL Server read-only Diagnostic Repository implementation using SQLAlchemy Async."""
 
 import asyncio
+import contextlib
+import ipaddress
+import logging
+import socket
 import xml.etree.ElementTree as ET
 from datetime import UTC, datetime
 from typing import Any
@@ -13,12 +17,14 @@ from sqlalchemy.exc import (
 from sqlalchemy.exc import (
     TimeoutError as SaTimeoutError,
 )
-from sqlalchemy.ext.asyncio import AsyncEngine
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
 from diag_mcp.contracts.dtos import (
     BlockingSessionCriteriaDTO,
     BlockingSessionDomainDTO,
     BoundedDiagnosticResultDTO,
+    DatabaseBackupStatusDTO,
+    DatabaseConnectivityDTO,
     DatabaseHealthDomainDTO,
     DeadlockCriteriaDTO,
     DeadlockDomainDTO,
@@ -29,6 +35,18 @@ from diag_mcp.contracts.dtos import (
 )
 from diag_mcp.contracts.errors import DatabaseDiagnosticError
 from diag_mcp.contracts.interfaces import DiagnosticRepository
+
+logger = logging.getLogger(__name__)
+
+BACKUP_TYPE_MAP: dict[str, str] = {
+    "D": "FULL",
+    "I": "DIFFERENTIAL",
+    "L": "LOG",
+    "F": "FILE",
+    "G": "DIFFERENTIAL_FILE",
+    "P": "PARTIAL",
+    "Q": "DIFFERENTIAL_PARTIAL",
+}
 
 
 class MssqlDiagnosticRepository(DiagnosticRepository):
@@ -43,10 +61,16 @@ class MssqlDiagnosticRepository(DiagnosticRepository):
         *,
         query_timeout_seconds: int = 5,
         max_rows: int = 50,
+        database_name: str | None = None,
+        host: str | None = None,
+        port: int | None = None,
     ) -> None:
         self._engine = engine
         self._query_timeout_seconds = query_timeout_seconds
         self._max_rows = max_rows
+        self._database_name = database_name or "SuperOffice"
+        self._host = host or "localhost"
+        self._port = port or 1433
 
     async def verify_snapshot_readiness(self) -> None:
         """Verify that ALLOW_SNAPSHOT_ISOLATION is ON (state=1) on the database catalog.
@@ -139,8 +163,254 @@ class MssqlDiagnosticRepository(DiagnosticRepository):
             details={"operation": operation},
         ) from None
 
+    async def _fetch_backup_status(self, conn: AsyncConnection) -> DatabaseBackupStatusDTO:
+        """Query bounded SQL Server backup history for the configured database.
+
+        Fails safe on permissions or query errors by returning UNAVAILABLE status
+        without failing the overall database health check or fabricating false.
+        """
+        sql_backup = text(
+            "SELECT TOP (:limit) "
+            "    type, "
+            "    MAX(backup_finish_date) AS latest_finish_date "
+            "FROM msdb.dbo.backupset "
+            "WHERE database_name = :database_name "
+            "  AND (is_damaged = 0 OR is_damaged IS NULL) "
+            "GROUP BY type "
+            "ORDER BY latest_finish_date DESC;"
+        )
+        effective_limit = min(self._max_rows, 50)
+        params: dict[str, Any] = {
+            "limit": effective_limit,
+            "database_name": self._database_name,
+        }
+
+        try:
+            result = await conn.execute(sql_backup, params)
+            rows = result.fetchall()
+        except Exception as exc:
+            orig = getattr(exc, "orig", None)
+            orig_str = str(orig).lower() if orig is not None else str(exc).lower()
+            sqlstate = ""
+            if orig is not None and hasattr(orig, "args") and orig.args:
+                sqlstate = str(orig.args[0])
+
+            if isinstance(exc, (TimeoutError, asyncio.TimeoutError, SaTimeoutError)):
+                err_msg = "Database backup history query timed out."
+            elif (
+                "28000" in sqlstate
+                or "42000" in sqlstate
+                or "permission" in orig_str
+                or "denied" in orig_str
+            ):
+                err_msg = "Database permission denied while querying msdb backup history."
+            elif "hyt00" in sqlstate or "hyt01" in sqlstate or "timeout" in orig_str:
+                err_msg = "Database backup history query timed out."
+            else:
+                err_msg = "Database backup history inspection unavailable."
+
+            logger.warning("Backup history inspection unavailable: %s", orig_str)
+            return DatabaseBackupStatusDTO(
+                backup_found=None,
+                status="UNAVAILABLE",
+                error_message=err_msg,
+            )
+
+        by_type: dict[str, datetime] = {}
+        latest_finish: datetime | None = None
+        latest_type: str | None = None
+
+        for r in rows:
+            if len(r) < 2:
+                continue
+            raw_type = str(r[0]).strip().upper() if r[0] is not None else ""
+            mapped_type = BACKUP_TYPE_MAP.get(raw_type, raw_type or "UNKNOWN")
+            raw_finish = r[1]
+            if isinstance(raw_finish, datetime):
+                # msdb.dbo.backupset.backup_finish_date does not record timezone offset.
+                # Retain as SQL Server recorded timestamp without fabricating UTC.
+                finish_recorded = (
+                    raw_finish.replace(tzinfo=None) if raw_finish.tzinfo else raw_finish
+                )
+            else:
+                continue
+
+            by_type[mapped_type] = finish_recorded
+            if latest_finish is None or finish_recorded > latest_finish:
+                latest_finish = finish_recorded
+                latest_type = mapped_type
+
+        if not by_type:
+            return DatabaseBackupStatusDTO(
+                backup_found=False,
+                latest_backup_at=None,
+                latest_backup_type=None,
+                latest_full_backup_at=None,
+                latest_differential_backup_at=None,
+                latest_log_backup_at=None,
+                status="AVAILABLE",
+            )
+
+        return DatabaseBackupStatusDTO(
+            backup_found=True,
+            latest_backup_at=latest_finish,
+            latest_backup_type=latest_type,
+            latest_full_backup_at=by_type.get("FULL"),
+            latest_differential_backup_at=by_type.get("DIFFERENTIAL"),
+            latest_log_backup_at=by_type.get("LOG"),
+            status="AVAILABLE",
+        )
+
+    @staticmethod
+    def _is_auth_failure(exc: Exception) -> bool:
+        """Check if exception represents a database authentication/login failure."""
+        orig = getattr(exc, "orig", None)
+        sqlstate = ""
+        if orig is not None and hasattr(orig, "args") and orig.args:
+            sqlstate = str(orig.args[0])
+        exc_str = (str(orig) if orig is not None else str(exc)).lower()
+        return (
+            "28000" in sqlstate or "login failed" in exc_str or "login failed for user" in exc_str
+        )
+
+    @staticmethod
+    def _is_timeout_failure(exc: Exception) -> bool:
+        """Check if exception represents a query or connection timeout."""
+        if isinstance(exc, (TimeoutError, asyncio.TimeoutError, SaTimeoutError)):
+            return True
+        orig = getattr(exc, "orig", None)
+        sqlstate = ""
+        if orig is not None and hasattr(orig, "args") and orig.args:
+            sqlstate = str(orig.args[0])
+        exc_str = (str(orig) if orig is not None else str(exc)).lower()
+        return "hyt00" in sqlstate.lower() or "hyt01" in sqlstate.lower() or "timeout" in exc_str
+
+    def _diagnose_query_failure(self, exc: Exception) -> DatabaseConnectivityDTO:
+        """Classify query-level failure when DB connection succeeded but query execution failed.
+
+        Does NOT execute any TCP fallback probe since the database connection
+        was already established.
+        """
+        if self._is_timeout_failure(exc):
+            return DatabaseConnectivityDTO(
+                state="DATABASE_QUERY_TIMEOUT",
+                observed_failure="Database health diagnostic query timed out.",
+            )
+        return DatabaseConnectivityDTO(
+            state="DATABASE_QUERY_FAILURE",
+            observed_failure="Database health diagnostic query failed.",
+        )
+
+    async def _probe_dns(self, timeout: float) -> DatabaseConnectivityDTO | None:
+        """Probe DNS resolution if host requires name resolution (not an IP)."""
+        is_ip = False
+        try:
+            ipaddress.ip_address(self._host)
+            is_ip = True
+        except ValueError:
+            is_ip = False
+
+        if is_ip:
+            return None
+
+        loop = asyncio.get_running_loop()
+        try:
+            await asyncio.wait_for(
+                loop.getaddrinfo(
+                    self._host,
+                    int(self._port),
+                    type=socket.SOCK_STREAM,
+                ),
+                timeout=timeout,
+            )
+            return None
+        except TimeoutError:
+            return DatabaseConnectivityDTO(
+                state="DNS_RESOLUTION_FAILURE",
+                observed_failure="Configured database hostname resolution timed out.",
+            )
+        except Exception:
+            return DatabaseConnectivityDTO(
+                state="DNS_RESOLUTION_FAILURE",
+                observed_failure="Failed to resolve configured database hostname.",
+            )
+
+    async def _probe_tcp(self, timeout: float) -> DatabaseConnectivityDTO | None:
+        """Probe bounded TCP connection strictly to configured host/port."""
+        try:
+            _, writer = await asyncio.wait_for(
+                asyncio.open_connection(self._host, int(self._port)),
+                timeout=timeout,
+            )
+            writer.close()
+            with contextlib.suppress(Exception):
+                await writer.wait_closed()
+            return None
+        except TimeoutError:
+            return DatabaseConnectivityDTO(
+                state="TCP_CONNECTIVITY_TIMEOUT",
+                observed_failure=(
+                    "TCP connection attempt to configured database endpoint timed out."
+                ),
+            )
+        except (ConnectionRefusedError, OSError):
+            return DatabaseConnectivityDTO(
+                state="TCP_CONNECTIVITY_FAILURE",
+                observed_failure=(
+                    "Failed to establish TCP connection to configured database endpoint."
+                ),
+            )
+
+    async def _diagnose_connection_failure(self, exc: Exception) -> DatabaseConnectivityDTO:
+        """Classify connection-level failure using bounded DNS and TCP probes.
+
+        Probes target configured host/port only.
+        """
+        try:
+            if self._is_auth_failure(exc):
+                return DatabaseConnectivityDTO(
+                    state="DATABASE_AUTHENTICATION_FAILURE",
+                    observed_failure="Database authentication failed for configured credentials.",
+                )
+
+            probe_timeout = min(float(self._query_timeout_seconds), 2.0)
+
+            dns_failure = await self._probe_dns(probe_timeout)
+            if dns_failure is not None:
+                return dns_failure
+
+            tcp_failure = await self._probe_tcp(probe_timeout)
+            if tcp_failure is not None:
+                return tcp_failure
+
+            if self._is_timeout_failure(exc):
+                return DatabaseConnectivityDTO(
+                    state="DATABASE_CONNECTION_TIMEOUT",
+                    observed_failure="Database connection attempt timed out.",
+                )
+
+            return DatabaseConnectivityDTO(
+                state="DATABASE_CONNECTION_FAILURE",
+                observed_failure=(
+                    "Database client failed to establish connection to database endpoint."
+                ),
+            )
+        except Exception:
+            return DatabaseConnectivityDTO(
+                state="UNKNOWN",
+                observed_failure=(
+                    "An unclassified failure occurred during database connectivity diagnosis."
+                ),
+            )
+
     async def get_database_health(self) -> DatabaseHealthDomainDTO:
-        """Fetch database availability, active connection count, and latency."""
+        """Fetch database health, connection count, latency, backup status, and connectivity.
+
+        When MSSQL is healthy: returns online status, active connection count, latency,
+        backup status, and CONNECTED state without performing extra fallback probes.
+        When MSSQL is unavailable or query fails: returns structured failure DTO without
+        raising tool error.
+        """
         start_time = datetime.now(UTC)
         sql = text(
             "SELECT COUNT(session_id) AS active_connections "
@@ -148,13 +418,56 @@ class MssqlDiagnosticRepository(DiagnosticRepository):
             "WHERE is_user_process = 1;"
         )
 
+        backup_status: DatabaseBackupStatusDTO | None = None
+        active_connections = 0
+
         try:
             async with self._engine.connect() as conn:
-                result = await conn.execute(sql)
-                row = result.fetchone()
-                active_connections = int(row[0]) if row and row[0] is not None else 0
-        except Exception as exc:
-            self._handle_exception(exc, "get_database_health")
+                try:
+                    result = await conn.execute(sql)
+                    row = result.fetchone()
+                    active_connections = int(row[0]) if row and row[0] is not None else 0
+                    backup_status = await self._fetch_backup_status(conn)
+                except Exception as query_exc:
+                    end_time = datetime.now(UTC)
+                    latency_ms = max(0.1, (end_time - start_time).total_seconds() * 1000.0)
+                    connectivity = self._diagnose_query_failure(query_exc)
+                    return DatabaseHealthDomainDTO(
+                        is_healthy=False,
+                        status_summary="DEGRADED",
+                        active_connections=0,
+                        latency_ms=round(latency_ms, 2),
+                        collected_at=end_time,
+                        backup_status=DatabaseBackupStatusDTO(
+                            backup_found=None,
+                            status="UNAVAILABLE",
+                            error_message=(
+                                "Database backup history inspection unavailable "
+                                "due to health query failure."
+                            ),
+                        ),
+                        connectivity=connectivity,
+                    )
+        except Exception as connect_exc:
+            end_time = datetime.now(UTC)
+            latency_ms = max(0.1, (end_time - start_time).total_seconds() * 1000.0)
+            connectivity = await self._diagnose_connection_failure(connect_exc)
+            return DatabaseHealthDomainDTO(
+                is_healthy=False,
+                status_summary="UNAVAILABLE",
+                active_connections=0,
+                latency_ms=round(latency_ms, 2),
+                collected_at=end_time,
+                backup_status=DatabaseBackupStatusDTO(
+                    backup_found=None,
+                    status="UNAVAILABLE",
+                    error_message=(
+                        "Database backup history inspection unavailable "
+                        "due to database connectivity failure."
+                    ),
+                ),
+                connectivity=connectivity,
+            )
 
         end_time = datetime.now(UTC)
         latency_ms = max(0.1, (end_time - start_time).total_seconds() * 1000.0)
@@ -165,6 +478,11 @@ class MssqlDiagnosticRepository(DiagnosticRepository):
             active_connections=active_connections,
             latency_ms=round(latency_ms, 2),
             collected_at=end_time,
+            backup_status=backup_status,
+            connectivity=DatabaseConnectivityDTO(
+                state="CONNECTED",
+                observed_failure=None,
+            ),
         )
 
     async def find_slow_queries(

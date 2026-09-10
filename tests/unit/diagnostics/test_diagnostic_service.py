@@ -8,6 +8,8 @@ from diag_mcp.contracts.dtos import (
     BlockingSessionCriteriaDTO,
     BlockingSessionDomainDTO,
     BoundedDiagnosticResultDTO,
+    DatabaseBackupStatusDTO,
+    DatabaseConnectivityDTO,
     DatabaseHealthDomainDTO,
     DeadlockCriteriaDTO,
     DeadlockDomainDTO,
@@ -172,3 +174,57 @@ async def test_application_service_ticket_diagnostic_fails_closed() -> None:
         await service.get_ticket_diagnostic_record(TicketDiagnosticCriteriaDTO(ticket_id=123))
 
     assert exc_info.value.error_code == "DIAGNOSTIC_SCHEMA_NOT_CONFIGURED"
+
+
+@pytest.mark.asyncio
+async def test_application_service_health_backup_status_sanitization() -> None:
+    """Service preserves backup_status and sanitizes any sensitive error_message text."""
+    repo = _MockDiagnosticRepository()
+    now = datetime.now(UTC)
+    repo.health_response = DatabaseHealthDomainDTO(
+        is_healthy=True,
+        status_summary="ONLINE",
+        active_connections=5,
+        latency_ms=1.5,
+        collected_at=now,
+        backup_status=DatabaseBackupStatusDTO(
+            backup_found=None,
+            status="UNAVAILABLE",
+            error_message="Query failed for admin@superoffice.com on host 10.0.0.1",
+        ),
+    )
+    service = DiagnosticsApplicationService(repo, RecursiveOutputSanitizer())
+
+    health = await service.get_database_health()
+    assert health.backup_status is not None
+    assert health.backup_status.status == "UNAVAILABLE"
+    assert health.backup_status.backup_found is None
+    assert health.backup_status.error_message is not None
+    assert "[REDACTED_EMAIL]" in health.backup_status.error_message
+    assert "admin@superoffice.com" not in health.backup_status.error_message
+
+
+@pytest.mark.asyncio
+async def test_application_service_connectivity_sanitization() -> None:
+    """Service preserves connectivity and sanitizes observed_failure text."""
+    repo = _MockDiagnosticRepository()
+    now = datetime.now(UTC)
+    repo.health_response = DatabaseHealthDomainDTO(
+        is_healthy=False,
+        status_summary="UNAVAILABLE",
+        active_connections=0,
+        latency_ms=2.1,
+        collected_at=now,
+        connectivity=DatabaseConnectivityDTO(
+            state="DATABASE_CONNECTION_FAILURE",
+            observed_failure="Failed connect for user admin@superoffice.com on server 10.0.0.1",
+        ),
+    )
+    service = DiagnosticsApplicationService(repo, RecursiveOutputSanitizer())
+
+    health = await service.get_database_health()
+    assert health.connectivity is not None
+    assert health.connectivity.state == "DATABASE_CONNECTION_FAILURE"
+    assert health.connectivity.observed_failure is not None
+    assert "[REDACTED_EMAIL]" in health.connectivity.observed_failure
+    assert "admin@superoffice.com" not in health.connectivity.observed_failure

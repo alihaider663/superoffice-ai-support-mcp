@@ -75,6 +75,9 @@ def create_diagnostic_repository(settings: DiagnosticsServerSettings) -> Diagnos
         engine=engine,
         query_timeout_seconds=settings.mssql_query_timeout_seconds,
         max_rows=settings.mssql_max_rows,
+        database_name=settings.mssql_database,
+        host=settings.mssql_host,
+        port=settings.mssql_port,
     )
 
 

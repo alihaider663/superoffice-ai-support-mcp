@@ -43,12 +43,26 @@ class DiagnosticsApplicationService:
     async def get_database_health(self) -> DatabaseHealthDomainDTO:
         """Fetch sanitized database health status."""
         health = await self._repository.get_database_health()
+        sanitized_backup_status = health.backup_status
+        if sanitized_backup_status and sanitized_backup_status.error_message:
+            clean_msg = self._sanitize_string(sanitized_backup_status.error_message)
+            sanitized_backup_status = sanitized_backup_status.model_copy(
+                update={"error_message": clean_msg}
+            )
+        sanitized_connectivity = health.connectivity
+        if sanitized_connectivity and sanitized_connectivity.observed_failure:
+            clean_obs = self._sanitize_string(sanitized_connectivity.observed_failure)
+            sanitized_connectivity = sanitized_connectivity.model_copy(
+                update={"observed_failure": clean_obs}
+            )
         return DatabaseHealthDomainDTO(
             is_healthy=health.is_healthy,
             status_summary=self._sanitize_string(health.status_summary),
             active_connections=health.active_connections,
             latency_ms=health.latency_ms,
             collected_at=health.collected_at,
+            backup_status=sanitized_backup_status,
+            connectivity=sanitized_connectivity,
         )
 
     async def find_slow_queries(
