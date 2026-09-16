@@ -25,7 +25,7 @@ jobs:
           fetch-depth: 1
 
       - name: Install uv and Python 3.12
-        uses: astral-sh/setup-uv@a6772c8f0a09dc9e3582c70a994b0c55af921803 # v5.1.0
+        uses: astral-sh/setup-uv@3377a30666f438759955882b3eba6a92b2b29b12 # v5.1.0
         with:
           python-version: "3.12"
           enable-cache: true
