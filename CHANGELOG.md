@@ -9,7 +9,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **SuperOffice Codebase Mirror & Synchronization Engine** (`so_mcp.sync`):
+  - Dual extraction pipelines supporting authenticated HTTP (`scripts/customer.fcgi`) and direct read-only MSSQL queries.
+  - Automated extraction of CRMScript / EJScript custom scripts, screen definitions, extra custom tables (`y_`), and configuration tables.
+  - Built-in regex security scanner (`secret_scanner.py`) detecting passwords, API tokens, connection strings, and credentials before file write.
+  - Windows/POSIX path and character sanitization (`sanitizer.py`).
+  - Hierarchical folder mirror generation matching SuperOffice navigation trees and deterministic `manifest.json` output.
+  - Operator synchronization CLI (`python -m so_mcp.sync.cli`) and PowerShell wrapper (`scripts/sync-so-codebase.ps1`).
+- **Platform Gateway Prompts & AI Guardrails** (`platform_gateway.prompts`):
+  - MCP Prompt protocol support (`prompts/list`, `prompts/get`) with reverse-proxy routing and in-memory TTL caching.
+  - Three canonical prompt templates: `investigate_support_ticket`, `diagnose_mssql_health`, and `analyze_crmscript_error`.
+  - Anti-hallucination guardrails: mandatory factual grounding, negative evidence interpretation rules (handling `CONNECTED` status and ring-buffer deadlock absence), and tool loop prevention.
+- **SuperOffice STDIO Runtime Entrypoint** (`so_mcp.stdio`):
+  - Direct STDIO runner (`python -m so_mcp.stdio`) for desktop MCP clients like Claude Desktop and Cursor.
+- **Client Presentation Materials**:
+  - Executive presentation deck (`SuperOffice_AI_Support_MCP_Client_Deck.pptx`) for stakeholder alignment and architectural walkthroughs.
+
 ### Changed
+- **Architectural Boundary Enforcement**:
+  - Enforced zero cross-server imports between `so_mcp` and `diag_mcp`, ensuring full fault-domain isolation verified by architectural contract tests.
+- **Diagnostics & Investigation Enhancements**:
+  - `find_deadlocks` tool enhanced with `hours_back` lookback window parameter mapped to UTC timestamp filtering.
+  - Clarified tool descriptions for `search_logs` and `get_ticket_diagnostic_record` to actively prevent AI retry loops when backends are unconfigured or awaiting DBA schema verification.
+  - Investigation service aggregator updated with diagnostic context enrichment.
+- **Regression Test Suite**:
+  - Expanded test baseline from 1,043 to **1,118 passing tests** (11 skipped opt-in live DB tests, 0 failures).
 - Repository professionalization and provider-neutral hygiene updates (FLC.5B).
 - Configuration-driven upstream endpoint detection in pre-flight development tooling.
 - Environment template expansion with complete MCP component defaults.

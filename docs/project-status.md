@@ -156,6 +156,18 @@ find_persons
 
 ---
 
+## 5.1 Canonical Prompt Inventory & AI Guardrails (Total 3)
+
+The platform gateway registers and exposes **3 canonical MCP prompts** (`prompts/list`, `prompts/get`) designed to guide external AI reasoning models through standardized diagnostic and investigation flows under strict anti-hallucination guardrails:
+
+| Prompt Name | Target Workflow | Key Arguments | Mandatory Invariants & Guardrails |
+| :--- | :--- | :--- | :--- |
+| `investigate_support_ticket` | End-to-end incident investigation for a SuperOffice CRM ticket | `ticket_id`, `include_db_diagnostics`, `hours_back` | **Factual Grounding**: Every finding must be grounded in tool output. **Negative Evidence**: `CONNECTED` DB status does not disprove past drops; zero deadlocks in window does not prove zero contention. **Loop Prevention**: Do not retry failed/blocked tools (`search_logs`, `get_ticket_diagnostic_record`). |
+| `diagnose_mssql_health` | Dedicated SQL Server health and performance triage | `include_slow_queries`, `include_deadlocks`, `hours_back` | Invariant awareness of 5-second query timeouts, 50-row result caps, and SNAPSHOT isolation. |
+| `analyze_crmscript_error` | Debugging SuperOffice CRMScript / EJScript execution failures | `script_name`, `error_message`, `ticket_id` | Structured syntax and runtime error triage without arbitrary code execution. |
+
+---
+
 ## 6. Registered Inventory vs. Current Operational Status
 
 The platform strictly distinguishes between **registered public contract inventory** and **current local operational status**. Not all 18 registered tools are operational in the local development environment:
@@ -558,11 +570,13 @@ Following the completion of Local Development Release 1.0, the project will prog
 The local platform has been comprehensively verified and validated across all unit, integration, and security test suites:
 
 - **Full Platform Regression Suite**:
-  - **Passed**: `1043` tests
+  - **Passed**: `1118` tests (expanded from 1,043 across 4 test phases)
   - **Skipped**: `11` tests (opt-in live database mutation tests guarded by environment variables)
   - **Failed**: `0`
 - **Focused Security & Contract Suite (FLC.2)**:
   - **Passed**: `396` tests (100% pass rate)
+- **Architecture Invariant Contracts**:
+  - **Passed**: 4/4 suites (Zero cross-server package imports; verified fault-domain isolation)
 - **Code Quality & Static Analysis**:
   - **Ruff (Linter)**: `PASS` (0 errors across `src/` and `tests/`)
   - **Ruff (Formatter)**: `PASS` (100% formatted)

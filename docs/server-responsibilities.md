@@ -49,6 +49,16 @@ Provides controlled, read-only access to SuperOffice CRM entities and ticket ope
 ### Operational Status
 All 8 tools are **OPERATIONAL** in local development using synthetic fixtures and mock HTTP clients.
 
+### Subsystems & Alternate Runtimes
+- **Codebase Mirror & Synchronization Subsystem (`so_mcp.sync`)**:
+  - Mirrors custom scripts (`ejscript`), screen definitions, and database schemas into a configured local directory (`SUPEROFFICE_CODEBASE_LOCAL_PATH`).
+  - Supports dual extraction modes: authenticated HTTP (`scripts/customer.fcgi`) and direct read-only MSSQL.
+  - Implements inline regex secret scanning and filesystem character sanitization.
+  - Generates immutable `manifest.json` tracking file hashes and security alerts.
+  - Managed via operator CLI (`python -m so_mcp.sync.cli`) or PowerShell script (`scripts/sync-so-codebase.ps1`).
+- **Direct STDIO Entrypoint (`so_mcp.stdio`)**:
+  - Provides a direct standard I/O application entrypoint for single-tenant desktop MCP clients (Claude Desktop, Cursor).
+
 ---
 
 ## 3. Diagnostics MCP Server (`diag-mcp`)
@@ -180,6 +190,8 @@ Central security perimeter, caller authentication, RBAC policy enforcement, and 
 * Structured JSON audit logging of all allowed and denied tool invocations
 * Streamable HTTP protocol routing to backend MCP servers
 * Recursive output sanitization and PII scrubbing before returning responses to AI clients
+* Canonical MCP Prompt registry & protocol routing (`prompts/list`, `prompts/get`) with TTL caching
+* AI investigation guardrails (factual grounding invariant, negative evidence rules, and tool loop prevention)
 
 ### Gateway Does NOT Own
 * SuperOffice business logic or entity transformations

@@ -3,7 +3,7 @@
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
 [![MCP Official SDK](https://img.shields.io/badge/MCP-Official%20SDK-orange.svg)](https://modelcontextprotocol.io/)
 [![Status](https://img.shields.io/badge/Status-Local%20Development%20Release%201.0-brightgreen.svg)]()
-[![Regression Tests](https://img.shields.io/badge/Tests-1043%20Passed-success.svg)]()
+[![Regression Tests](https://img.shields.io/badge/Tests-1118%20Passed-success.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 An enterprise-grade, secure, modular Model Context Protocol (MCP) platform for AI-assisted SuperOffice CRM support triage, diagnostic telemetry, and cross-system incident investigation.
@@ -115,6 +115,18 @@ The Gateway exposes exactly **18 registered public tools** over Streamable HTTP 
 
 ---
 
+## Gateway Prompts & AI Guardrails (3 Prompts)
+
+The MCP Gateway exposes structured, versioned prompt templates (`prompts/list`, `prompts/get`) with embedded operational rules and anti-hallucination guardrails:
+
+| Prompt Name | Purpose | Key Guardrails & Arguments |
+| :--- | :--- | :--- |
+| `investigate_support_ticket` | End-to-end incident triage for a SuperOffice ticket | Factual grounding invariant, negative evidence rules (e.g. `CONNECTED` status doesn't disprove intermittent drops; zero deadlocks in lookback window doesn't prove zero contention), and tool loop prevention. Args: `ticket_id`, `include_db_diagnostics`, `hours_back`. |
+| `diagnose_mssql_health` | Dedicated SQL Server health and performance triage | Enforces 5s statement timeout awareness, 50-row result caps, and SNAPSHOT isolation guidance. Args: `include_slow_queries`, `include_deadlocks`, `hours_back`. |
+| `analyze_crmscript_error` | Custom SuperOffice CRMScript / EJScript debug flow | Analyzes syntax, runtime exceptions, and database interactions while guarding against arbitrary script execution. Args: `script_name`, `error_message`, `ticket_id`. |
+
+---
+
 ## Security Model & Policy Invariants
 
 - **Deny-by-Default RBAC**: Declarative tool-level policy defined in `tool_permissions.yaml` and enforced by `YamlPolicyEngine`. Unknown roles or unmapped tools are unconditionally rejected (`DENY`).
@@ -144,6 +156,43 @@ The Gateway exposes exactly **18 registered public tools** over Streamable HTTP 
   python -m kb_mcp.ingestion.cli ingest path/to/document.md
   ```
   Supported local formats: `.md`, `.markdown`, `.txt`, Runbook `.json`, Known-Issue `.json`. (PDF, DOCX, HTML, OCR, and YAML are deferred).
+
+---
+
+## SuperOffice Codebase Mirror & Synchronization Engine
+
+The platform includes an automated synchronization engine (`so_mcp.sync`) that mirrors custom scripts, screen definitions, and database schemas from an Onsite SuperOffice instance to a local filesystem directory (e.g., `F:\CodeBase_SuperOffice`) for offline static analysis, indexing, and AI assistance:
+
+- **Dual Extraction Modes**:
+  - **`http`**: Extracts scripts, screens, and schemas via authenticated SuperOffice CRMScript handler (`scripts/customer.fcgi`).
+  - **`mssql`**: Directly queries database metadata (`dbo.hierarchy`, `dbo.ejscript`, `dbo.screen_definition`, custom `y_` tables) with safety controls and zero cross-server dependencies.
+- **Security & Secret Scanner**: Pre-scans every script body with regex pattern matchers for API keys, passwords, bearer tokens, connection strings, and base64 credentials before persisting to disk.
+- **Deterministic Mirroring & Manifest**: Generates clean folder trees matching SuperOffice hierarchy paths, file sanitization for Windows/POSIX safety, and an immutable `manifest.json`.
+- **Operator Commands**:
+  ```powershell
+  # Sync entire codebase using PowerShell helper
+  .\scripts\sync-so-codebase.ps1 -OutputDir "F:\CodeBase_SuperOffice" -Mode http
+
+  # Dry-run evaluation (no disk writes)
+  .\scripts\sync-so-codebase.ps1 -DryRun -Verbose
+
+  # Direct Python CLI
+  uv run python -m so_mcp.sync.cli -o "F:\CodeBase_SuperOffice" -m http -t "ejscript,screens,schema"
+  ```
+
+---
+
+## Client Integrations & Desktop Run Modes
+
+- **Streamable HTTP (Multi-Client Gateway)**:
+  Run the platform services via `.\scripts\start-local.ps1` and connect clients to the MCP Gateway at `http://127.0.0.1:8000/mcp`.
+- **Direct STDIO Transport (Claude Desktop / Cursor)**:
+  SuperOffice MCP can run directly over standard input/output without starting HTTP daemons:
+  ```bash
+  uv run python -m so_mcp.stdio
+  ```
+- **Stakeholder Presentation Deck**:
+  A complete executive presentation deck is provided at [`SuperOffice_AI_Support_MCP_Client_Deck.pptx`](SuperOffice_AI_Support_MCP_Client_Deck.pptx) covering architecture, security boundaries, diagnostic workflows, and the local-to-production roadmap.
 
 ---
 
@@ -178,7 +227,7 @@ The Gateway exposes exactly **18 registered public tools** over Streamable HTTP 
 The codebase maintains a 100% verified baseline with zero lint or type errors:
 
 ```bash
-# Run full regression suite (1043 passed, 11 skipped live-DB tests)
+# Run full regression suite (1118 passed, 11 skipped live-DB tests)
 uv run pytest
 
 # Linting and style verification
