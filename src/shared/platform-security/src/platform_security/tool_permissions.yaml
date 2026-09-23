@@ -65,6 +65,11 @@ tools:
     classification: READ_ONLY
     data_level: RESTRICTED
     description: "Find contact persons matching criteria"
+  sync_codebase:
+    minimum_role: L2
+    classification: READ_ONLY
+    data_level: INTERNAL
+    description: "Synchronize SuperOffice CRMScripts, screens, and custom tables to local mirror directory"
   update_ticket_status:
     minimum_role: L2
     classification: SENSITIVE_WRITE

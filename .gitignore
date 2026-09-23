@@ -53,6 +53,8 @@ logs/
 # Temporary files
 tmp/
 temp/
+*.backup.*
+*.backup
 
 # Local databases and dumps
 *.db

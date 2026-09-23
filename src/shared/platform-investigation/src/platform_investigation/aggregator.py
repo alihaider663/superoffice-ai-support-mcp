@@ -1,5 +1,6 @@
 """Generic multi-source evidence aggregation runtime."""
 
+import asyncio
 from collections.abc import Sequence
 from datetime import UTC, datetime
 
@@ -23,11 +24,12 @@ logger = get_logger(__name__)
 
 
 class EvidenceAggregatorEngine(EvidenceAggregator):
-    """Deterministic, sequential multi-source evidence aggregation engine.
+    """Deterministic, concurrent multi-source evidence aggregation engine.
 
     Enforces:
     - Dependency-injected sequence of OutcomeAwareEvidenceCollector instances.
-    - Deterministic sequential execution in registration order (no concurrency in Phase 3.2).
+    - Concurrent collector execution via asyncio.gather.
+    - Deterministic registration-order validation and error handling.
     - Exception isolation: unexpected collector failures are safely normalized to FAILED outcomes.
     - Fail-closed duplicate evidence ID detection (DuplicateEvidenceIdError).
     - Strict provenance verification between collector, outcome, and evidence items.
@@ -64,13 +66,13 @@ class EvidenceAggregatorEngine(EvidenceAggregator):
         seen_evidence_ids: set[str] = set()
         source_outcomes: list[SourceCollectionResult] = []
 
-        # Execute collectors deterministically in registration order
-        for collector in self._collectors:
+        async def _collect_safe(
+            collector: OutcomeAwareEvidenceCollector,
+        ) -> SourceCollectionResult:
             source_type = collector.source_type
             try:
-                outcome = await collector.collect(inv_id, corr_key)
+                return await collector.collect(inv_id, corr_key)
             except Exception:
-                # Safe structured error logging without leaking raw exception string or traceback
                 logger.error(
                     "Unexpected exception during source evidence collection",
                     investigation_id=inv_id,
@@ -78,7 +80,7 @@ class EvidenceAggregatorEngine(EvidenceAggregator):
                     source_type=source_type.value,
                     error_code="SOURCE_EXECUTION_FAILED",
                 )
-                outcome = SourceCollectionResult(
+                return SourceCollectionResult(
                     source_type=source_type,
                     status=SourceCollectionStatus.FAILED,
                     evidence=(),
@@ -86,6 +88,12 @@ class EvidenceAggregatorEngine(EvidenceAggregator):
                     error_message="An unexpected error occurred during source collection.",
                 )
 
+        # Execute all collectors concurrently via asyncio.gather
+        raw_outcomes = await asyncio.gather(*[_collect_safe(c) for c in self._collectors])
+
+        # Validate results deterministically in registration order
+        for collector, outcome in zip(self._collectors, raw_outcomes, strict=True):
+            source_type = collector.source_type
             # Validate source identity match
             if outcome.source_type != source_type:
                 raise EvidenceProvenanceMismatchError(

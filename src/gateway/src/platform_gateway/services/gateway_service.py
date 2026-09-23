@@ -226,3 +226,14 @@ class GatewayApplicationService:
             await audit_ctx.record_failure(reason=err_code)
 
         return dispatch_res
+
+    @property
+    def dispatcher(self) -> StreamableHttpDispatcher:
+        """Access the underlying dispatcher."""
+        return self._dispatcher
+
+    async def aclose(self) -> None:
+        """Gracefully release gateway resources including connection pools."""
+        if hasattr(self._dispatcher, "aclose"):
+            await self._dispatcher.aclose()
+

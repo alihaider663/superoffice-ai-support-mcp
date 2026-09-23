@@ -32,10 +32,11 @@ class SuperOfficeEvidenceCollector:
     - If ticket_id is provided: executes exactly one get_ticket(ticket_id) call.
 
     Data minimization:
-    - Only structured diagnostic metadata: ticket_id, status, category, priority.
-    - Title is a safe fixed generic value: 'SuperOffice ticket observation'.
+    - Structured diagnostic metadata: ticket_id, title, status, category, priority,
+      sanitized_description, sanitized_customer_reference.
+    - Title in evidence envelope is a safe fixed generic value: 'SuperOffice ticket observation'.
     - Tags are controlled fixed values: ('crm', 'ticket', 'superoffice').
-    - NO description, customer reference, agent ID, or free text in evidence data.
+    - NO internal agent ID or direct raw PII in evidence data.
     - Zero attachment access.
     """
 
@@ -107,9 +108,12 @@ class SuperOfficeEvidenceCollector:
             timestamp=ticket.created_at if isinstance(ticket.created_at, datetime) else now,
             data={
                 "ticket_id": ticket.ticket_id,
+                "title": ticket.title,
                 "status": ticket.status,
                 "category": ticket.category,
                 "priority": ticket.priority,
+                "sanitized_description": ticket.sanitized_description,
+                "sanitized_customer_reference": ticket.sanitized_customer_reference,
             },
             tags=("crm", "ticket", "superoffice"),
             correlation_references=(

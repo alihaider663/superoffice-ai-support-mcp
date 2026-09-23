@@ -7,7 +7,7 @@ Verifies the complete four-hop Streamable HTTP architecture:
 4. Subordinate MCP ASGI Applications (SuperOffice MCP, Diagnostics MCP)
 
 Enforces:
-- 18 Gateway tools, investigate_incident present exactly once, zero internal engine actions
+- 19 Gateway tools, investigate_incident present exactly once, zero internal engine actions
 - Complete schema fidelity with InvestigateIncidentRequestDTO and InvestigateIncidentResponseDTO
 - L1/L2 deny, L3 allow; privilege flags cannot substitute for L3
 - Authorization-before-dispatch and rate-limit-before-dispatch
@@ -516,15 +516,15 @@ def _get_text(res: CallToolResult) -> str:
 
 @pytest.mark.asyncio
 async def test_official_mcp_tools_list_discovery_and_schema_fidelity() -> None:
-    """Section 13, 14, 15: Client discovers 18 tools, investigate_incident schema fidelity."""
+    """Section 13, 14, 15: Client discovers 19 tools, investigate_incident schema fidelity."""
     async with create_e2e_cluster() as cluster:
         token = cluster.make_token(role="L3")
         async with official_session(cluster, token=token) as session:
             tools_result = await session.list_tools()
             tools: list[Tool] = tools_result.tools
 
-            # Assert exactly 18 active Gateway tools
-            assert len(tools) == 18
+            # Assert exactly 19 active Gateway tools
+            assert len(tools) == 19
 
             # Assert investigate_incident is present exactly once
             inv_tools = [t for t in tools if t.name == "investigate_incident"]

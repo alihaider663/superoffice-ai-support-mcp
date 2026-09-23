@@ -166,9 +166,18 @@ class TicketObservationDTO(PlatformBaseModel):
 
     observation_type: Literal["ticket"] = "ticket"
     ticket_id: int = Field(..., description="SuperOffice ticket identifier")
+    title: str | None = Field(default=None, description="Sanitized ticket subject or title")
     status: str = Field(..., description="Ticket status")
     category: str = Field(..., description="Ticket category")
     priority: str = Field(..., description="Ticket priority level")
+    sanitized_description: str | None = Field(
+        default=None,
+        description="Sanitized ticket problem description or symptom text",
+    )
+    sanitized_customer_reference: str | None = Field(
+        default=None,
+        description="Sanitized customer reference identifier",
+    )
 
 
 class DatabaseHealthObservationDTO(PlatformBaseModel):

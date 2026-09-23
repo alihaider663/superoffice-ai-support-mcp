@@ -29,6 +29,20 @@ from platform_observability.logging import get_logger
 logger = get_logger(__name__)
 
 
+class PooledTransport(httpx.AsyncBaseTransport):
+    """Passthrough transport preventing per-request client.aclose() from closing pool."""
+
+    def __init__(self, underlying: httpx.AsyncBaseTransport) -> None:
+        self._underlying = underlying
+
+    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+        return await self._underlying.handle_async_request(request)
+
+    async def aclose(self) -> None:
+        # Keep underlying connection pool open across requests
+        pass
+
+
 class HttpToolDispatcher(StreamableHttpDispatcher):
     """Production Streamable HTTP dispatcher communicating with downstream MCP server backends.
 
@@ -36,6 +50,7 @@ class HttpToolDispatcher(StreamableHttpDispatcher):
     - Target server URL resolution via trusted GatewayBackendRegistry (anti-SSRF).
     - Trusted identity context injection via sanitized internal headers.
     - Official MCP SDK streamable_http_client and ClientSession protocol lifecycle.
+    - Persistent HTTP keep-alive connection pooling across dispatches.
     - Bounded transport timeouts and safe error mapping into SanitizedErrorPayload.
     """
 
@@ -45,10 +60,19 @@ class HttpToolDispatcher(StreamableHttpDispatcher):
         http_client: httpx.AsyncClient | None = None,
         *,
         default_timeout_seconds: float = 30.0,
+        limits: httpx.Limits | None = None,
     ) -> None:
         self._backend_registry = backend_registry
         self._http_client = http_client
         self._default_timeout_seconds = default_timeout_seconds
+        self._limits = limits or httpx.Limits(
+            max_keepalive_connections=20,
+            max_connections=50,
+            keepalive_expiry=30.0,
+        )
+        self._transport: httpx.AsyncHTTPTransport | None = (
+            None if http_client is not None else httpx.AsyncHTTPTransport(limits=self._limits)
+        )
 
     def _build_trusted_headers(
         self,
@@ -136,7 +160,13 @@ class HttpToolDispatcher(StreamableHttpDispatcher):
         owns_client = False
 
         if client_to_use is None:
+            transport_to_use = (
+                PooledTransport(self._transport)
+                if self._transport is not None
+                else httpx.AsyncHTTPTransport(limits=self._limits)
+            )
             client_to_use = httpx.AsyncClient(
+                transport=transport_to_use,
                 headers=trusted_headers,
                 timeout=timeout_config,
                 follow_redirects=False,
@@ -248,3 +278,9 @@ class HttpToolDispatcher(StreamableHttpDispatcher):
         finally:
             if owns_client:
                 await client_to_use.aclose()
+
+    async def aclose(self) -> None:
+        """Close persistent HTTP transport pool."""
+        if self._transport is not None:
+            await self._transport.aclose()
+

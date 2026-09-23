@@ -37,6 +37,8 @@ class SuperOfficePageResponse[T: PlatformBaseModel](PlatformBaseModel):
 class TicketSearchCriteriaDTO(PlatformBaseModel):
     """Structured criteria for searching SuperOffice tickets."""
 
+    title: str | None = Field(default=None, description="Ticket title substring filter")
+    category: str | None = Field(default=None, description="Ticket category name filter")
     status: str | None = Field(default=None, description="Ticket status filter (e.g. Open)")
     category_id: int | None = Field(default=None, ge=1, description="Ticket category identifier")
     customer_id: int | None = Field(default=None, ge=1, description="Customer company or person ID")
@@ -48,6 +50,7 @@ class CompanySearchCriteriaDTO(PlatformBaseModel):
     """Structured criteria for searching SuperOffice companies."""
 
     name: str | None = Field(default=None, min_length=1, description="Company name prefix/match")
+    category: str | None = Field(default=None, description="Company category name or code filter")
     company_id: int | None = Field(default=None, ge=1, description="Company numeric identifier")
     page: int = Field(default=1, ge=1, description="Page number")
     page_size: int = Field(default=20, ge=1, le=100, description="Page size limit")

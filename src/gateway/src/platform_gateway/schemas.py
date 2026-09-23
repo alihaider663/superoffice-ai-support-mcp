@@ -406,11 +406,29 @@ INVESTIGATE_INCIDENT_OUTPUT_SCHEMA = {
                     "title": "Priority",
                     "type": "string",
                 },
+                "sanitized_customer_reference": {
+                    "anyOf": [{"type": "string"}, {"type": "null"}],
+                    "default": None,
+                    "description": "Sanitized customer reference identifier",
+                    "title": "Sanitized Customer Reference",
+                },
+                "sanitized_description": {
+                    "anyOf": [{"type": "string"}, {"type": "null"}],
+                    "default": None,
+                    "description": "Sanitized ticket problem description or symptom text",
+                    "title": "Sanitized Description",
+                },
                 "status": {"description": "Ticket status", "title": "Status", "type": "string"},
                 "ticket_id": {
                     "description": "SuperOffice ticket identifier",
                     "title": "Ticket Id",
                     "type": "integer",
+                },
+                "title": {
+                    "anyOf": [{"type": "string"}, {"type": "null"}],
+                    "default": None,
+                    "description": "Sanitized ticket subject or title",
+                    "title": "Title",
                 },
             },
             "required": ["ticket_id", "status", "category", "priority"],
@@ -446,10 +464,10 @@ INVESTIGATE_INCIDENT_OUTPUT_SCHEMA = {
 def get_platform_tool_schemas() -> list[Tool]:
     """Return official MCP Tool definitions with complete JSON schemas for approved platform tools.
 
-    Inventory (18 Approved & Blocked Platform Tools):
+    Inventory (19 Approved & Blocked Platform Tools):
     - Knowledge (3 tools): search_knowledge, get_runbook, find_known_issues
-    - SuperOffice (8 tools): get_ticket, search_tickets, get_ticket_messages, list_attachments,
-                             get_company, find_companies, get_person, find_persons
+    - SuperOffice (9 tools): get_ticket, search_tickets, get_ticket_messages, list_attachments,
+                             get_company, find_companies, get_person, find_persons, sync_codebase
     - Diagnostics (6 tools): get_database_health, find_slow_queries, get_ticket_diagnostic_record,
                              search_logs, find_deadlocks, find_blocking_sessions
     - Infrastructure (0 tools): Deferred per Decision 2A-D07
@@ -645,6 +663,37 @@ def get_platform_tool_schemas() -> list[Tool]:
                 },
             },
         ),
+        Tool(
+            name="sync_codebase",
+            description=(
+                "Sync SuperOffice CRMScripts, screens, and custom tables to local mirror directory"
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "mode": {
+                        "type": "string",
+                        "enum": ["http", "mssql"],
+                        "description": (
+                            "Extraction mode: 'http' via CRMScript handler, "
+                            "or 'mssql' via direct database connection"
+                        ),
+                    },
+                    "tables": {
+                        "type": "string",
+                        "description": (
+                            "Comma-separated entities to sync (e.g. 'ejscript,screens,schema' "
+                            "or 'all')"
+                        ),
+                    },
+                    "dry_run": {
+                        "type": "boolean",
+                        "description": "If true, scans and evaluates without writing files to disk",
+                        "default": False,
+                    },
+                },
+            },
+        ),
         # Diagnostics MCP Tools (L2 & L3)
         Tool(
             name="get_database_health",
@@ -658,7 +707,8 @@ def get_platform_tool_schemas() -> list[Tool]:
                 "NOT by itself prove client timeout, SQL saturation, VPN/firewall failure, "
                 "connection pool exhaustion, or outage cause. Do not recommend changing "
                 "connection timeouts, firewall, VPN, or database network configurations "
-                "without concrete supporting evidence."
+                "without concrete supporting evidence. Note: Included automatically in "
+                "investigate_incident if include_database_health=true."
             ),
             inputSchema={
                 "type": "object",
@@ -670,7 +720,8 @@ def get_platform_tool_schemas() -> list[Tool]:
             description=(
                 "Inspect slow query execution records from the SQL Server plan cache "
                 "(sys.dm_exec_query_stats). Metrics represent cached and aggregated historical "
-                "averages per execution, not proof of query execution at the exact current moment."
+                "averages per execution, not proof of query execution at the exact current moment. "
+                "Note: Included automatically in investigate_incident."
             ),
             inputSchema={
                 "type": "object",
@@ -690,7 +741,11 @@ def get_platform_tool_schemas() -> list[Tool]:
         ),
         Tool(
             name="get_ticket_diagnostic_record",
-            description="Get diagnostic database records for a ticket (BLOCKED: awaiting schema)",
+            description=(
+                "Get diagnostic database records for a ticket (BLOCKED: Awaiting schema "
+                "verification. Do not call or retry calling this tool; use investigate_incident "
+                "or get_ticket instead)."
+            ),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -704,7 +759,11 @@ def get_platform_tool_schemas() -> list[Tool]:
         ),
         Tool(
             name="search_logs",
-            description="Search application and API log entries (BLOCKED: awaiting log backend)",
+            description=(
+                "Search application and API log entries (BLOCKED: Log backend is unconfigured "
+                "in this environment. Do not call or retry calling this tool; rely on database "
+                "and ticket diagnostics instead)."
+            ),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -727,7 +786,8 @@ def get_platform_tool_schemas() -> list[Tool]:
                 "Query deadlock events captured in the SQL Server system_health ring buffer within "
                 "the queried time window (hours_back, default 24). Zero returned deadlocks means "
                 "only that none were captured within that specific window; it does NOT prove "
-                "historical absence outside that window or absence of other contention."
+                "historical absence outside that window or absence of other contention. Note: "
+                "Included automatically in investigate_incident."
             ),
             inputSchema={
                 "type": "object",
@@ -761,8 +821,10 @@ def get_platform_tool_schemas() -> list[Tool]:
         Tool(
             name="investigate_incident",
             description=(
-                "Orchestrate structured, cross-domain diagnostic "
-                "investigation of a platform incident"
+                "Orchestrate structured, cross-domain diagnostic investigation of a platform "
+                "incident. Preferred primary tool for incident investigation. Aggregates ticket "
+                "context, database health, deadlocks, and slow queries in a single roundtrip, "
+                "avoiding redundant separate diagnostic tool calls."
             ),
             inputSchema=INVESTIGATE_INCIDENT_INPUT_SCHEMA,
             outputSchema=INVESTIGATE_INCIDENT_OUTPUT_SCHEMA,

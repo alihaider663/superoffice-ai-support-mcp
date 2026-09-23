@@ -21,6 +21,7 @@ from platform_gateway.constants import (
     PROHIBITED_CALLER_HEADERS,
 )
 from platform_gateway.contracts.routing import GatewayRoutingTable
+from platform_gateway.prompts import get_platform_prompt_result, get_platform_prompts
 from platform_gateway.registry import GatewayBackendRegistry, create_default_routing_table
 from platform_gateway.schemas import get_platform_tool_schemas
 from platform_gateway.services.gateway_service import GatewayApplicationService
@@ -154,6 +155,19 @@ def create_gateway_server(
                 isError=True,
             )
 
+    @server.list_prompts()  # type: ignore[no-untyped-call, untyped-decorator]
+    async def list_prompts() -> list[types.Prompt]:
+        """Return the canonical platform prompts."""
+        return get_platform_prompts()
+
+    @server.get_prompt()  # type: ignore[untyped-decorator]
+    async def get_prompt(
+        name: str,
+        arguments: dict[str, Any] | None,
+    ) -> types.GetPromptResult:
+        """Resolve and format platform prompt messages."""
+        return get_platform_prompt_result(name=name, arguments=arguments)
+
     session_manager = StreamableHTTPSessionManager(server, stateless=True)
     return server, session_manager
 
@@ -218,6 +232,70 @@ async def _execute_json_tool_call(
     )
 
 
+def _handle_json_metadata_call(
+    method: str,
+    params: dict[str, Any],
+    rpc_id: Any,
+) -> JSONResponse | None:
+    """Handle initialize, ping, and tools/list for fallback JSON handler."""
+    if method == "initialize":
+        client_proto = str(params.get("protocolVersion", "")).strip()
+        supported = {"2024-11-05", "2025-03-26", "2025-11-25"}
+        negotiated = client_proto if client_proto in supported else "2024-11-05"
+        return JSONResponse(
+            {
+                "jsonrpc": "2.0",
+                "id": rpc_id,
+                "result": {
+                    "protocolVersion": negotiated,
+                    "capabilities": {
+                        "tools": {"listChanged": False},
+                        "prompts": {"listChanged": False},
+                    },
+                    "serverInfo": {"name": "superoffice-ai-gateway", "version": "0.1.0"},
+                },
+            }
+        )
+    if method == "ping":
+        return JSONResponse({"jsonrpc": "2.0", "id": rpc_id, "result": {}})
+    if method == "tools/list":
+        schemas = [t.model_dump(mode="json") for t in get_platform_tool_schemas()]
+        return JSONResponse({"jsonrpc": "2.0", "id": rpc_id, "result": {"tools": schemas}})
+    return None
+
+
+def _execute_json_prompt_call(
+    method: str,
+    params: dict[str, Any],
+    rpc_id: Any,
+) -> JSONResponse:
+    """Execute prompts/list and prompts/get for fallback JSON handler."""
+    if method == "prompts/list":
+        prompts = [p.model_dump(mode="json") for p in get_platform_prompts()]
+        return JSONResponse({"jsonrpc": "2.0", "id": rpc_id, "result": {"prompts": prompts}})
+
+    prompt_name = str(params.get("name", ""))
+    prompt_args = params.get("arguments")
+    try:
+        prompt_res = get_platform_prompt_result(prompt_name, prompt_args)
+        return JSONResponse(
+            {
+                "jsonrpc": "2.0",
+                "id": rpc_id,
+                "result": prompt_res.model_dump(mode="json"),
+            }
+        )
+    except ValueError as exc:
+        return JSONResponse(
+            {
+                "jsonrpc": "2.0",
+                "id": rpc_id,
+                "error": {"code": -32602, "message": str(exc)},
+            },
+            status_code=404,
+        )
+
+
 def create_gateway_app(
     settings: GatewayAppSettings | None = None,
     service: GatewayApplicationService | None = None,
@@ -250,7 +328,11 @@ def create_gateway_app(
     @asynccontextmanager
     async def lifespan(app: Starlette) -> AsyncGenerator[None, None]:  # noqa: ARG001
         async with session_manager.run():
-            yield
+            try:
+                yield
+            finally:
+                if hasattr(active_service, "aclose"):
+                    await active_service.aclose()
 
     async def health_endpoint(request: Request) -> JSONResponse:  # noqa: ARG001
         return JSONResponse({"status": "healthy", "service": "platform-gateway"})
@@ -274,28 +356,13 @@ def create_gateway_app(
         method = body_json.get("method")
         params = body_json.get("params", {})
 
-        if method == "initialize":
-            client_proto = str(params.get("protocolVersion", "")).strip()
-            supported = {"2024-11-05", "2025-03-26", "2025-11-25"}
-            negotiated = client_proto if client_proto in supported else "2024-11-05"
-            return JSONResponse(
-                {
-                    "jsonrpc": "2.0",
-                    "id": rpc_id,
-                    "result": {
-                        "protocolVersion": negotiated,
-                        "capabilities": {"tools": {"listChanged": False}},
-                        "serverInfo": {"name": "superoffice-ai-gateway", "version": "0.1.0"},
-                    },
-                }
-            )
-        if method == "ping":
-            return JSONResponse({"jsonrpc": "2.0", "id": rpc_id, "result": {}})
-        if method == "tools/list":
-            schemas = [t.model_dump(mode="json") for t in get_platform_tool_schemas()]
-            return JSONResponse({"jsonrpc": "2.0", "id": rpc_id, "result": {"tools": schemas}})
+        metadata_res = _handle_json_metadata_call(method, params, rpc_id)
+        if metadata_res is not None:
+            return metadata_res
         if method == "tools/call":
             return await _execute_json_tool_call(active_service, params, request, rpc_id)
+        if method in ("prompts/list", "prompts/get"):
+            return _execute_json_prompt_call(method, params, rpc_id)
 
         return JSONResponse(
             {

@@ -115,17 +115,17 @@ class TestSuperOfficeEvidenceCollector:
         assert ref.namespace == "ticket"
         assert ref.value == "42"
 
-        # Strictly minimized data payload
+        # Structured diagnostic data payload with sanitized context
         assert evidence.data == {
             "ticket_id": 42,
+            "title": "Secret Free Text Customer Subject",
             "status": "In Progress",
             "category": "Billing",
             "priority": "Medium",
+            "sanitized_description": "Sensitive description text",
+            "sanitized_customer_reference": "CUST-SECRET-999",
         }
-        assert "sanitized_description" not in evidence.data
-        assert "sanitized_customer_reference" not in evidence.data
         assert "assigned_agent_id" not in evidence.data
-        assert "title" not in evidence.data
 
     @pytest.mark.asyncio
     async def test_collect_failed_on_port_exception(self) -> None:

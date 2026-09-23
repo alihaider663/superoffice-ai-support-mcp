@@ -1,16 +1,19 @@
 """Unit tests for SuperOffice FastMCP server tool registration and DNS rebinding."""
 
+from unittest.mock import AsyncMock
+
 import pytest
 from starlette.testclient import TestClient
 
 from so_mcp.contracts.dtos import TicketDetailDomainDTO
 from so_mcp.contracts.errors import SuperOfficeIntegrationError
 from so_mcp.server import create_app, create_superoffice_mcp_server
+from so_mcp.sync.contracts import SyncManifestDTO, SyncResultDTO
 from tests.fakes.fake_superoffice_client import FakeSuperOfficeClient
 
 
-def test_so_server_registers_all_8_approved_tools() -> None:
-    """SuperOffice FastMCP server registers exactly the 8 approved read-only SuperOffice tools."""
+def test_so_server_registers_all_approved_tools() -> None:
+    """SuperOffice FastMCP server registers approved operations including sync_codebase."""
     server = create_superoffice_mcp_server()
     tool_names = {tool.name for tool in server._tool_manager.list_tools()}
     expected_tools = {
@@ -22,6 +25,7 @@ def test_so_server_registers_all_8_approved_tools() -> None:
         "find_companies",
         "get_person",
         "find_persons",
+        "sync_codebase",
     }
     assert tool_names == expected_tools
 
@@ -137,3 +141,27 @@ async def test_synthetic_fallback_regression_never_emits_unwired_stubs() -> None
 
     with pytest.raises(SuperOfficeIntegrationError):
         await tools["get_ticket"].fn(ticket_id=10198)
+
+
+@pytest.mark.asyncio
+async def test_so_server_sync_codebase_invocation(tmp_path) -> None:
+    """SuperOffice FastMCP server invokes sync_codebase and returns serialized manifest."""
+    mock_sync_service = AsyncMock()
+    manifest = SyncManifestDTO(
+        generated_at="2026-09-23T12:00:00Z",
+        source_mode="http",
+        target_dir=str(tmp_path),
+        total_scripts=3,
+        total_screens=1,
+        total_extra_tables=2,
+    )
+    mock_sync_service.sync.return_value = SyncResultDTO(success=True, manifest=manifest)
+
+    server = create_superoffice_mcp_server(sync_service=mock_sync_service)
+    tools = server._tool_manager._tools
+
+    res = await tools["sync_codebase"].fn(mode="http", dry_run=True)
+    assert res["success"] is True
+    assert res["manifest"]["total_scripts"] == 3
+    mock_sync_service.sync.assert_called_once_with(mode="http", tables=None, dry_run=True)
+

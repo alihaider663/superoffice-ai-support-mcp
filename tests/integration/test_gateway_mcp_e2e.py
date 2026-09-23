@@ -225,8 +225,9 @@ def test_e2e_mcp_tools_list_discovery() -> None:
         assert data["jsonrpc"] == "2.0"
         assert data["id"] == "req-tools-list-01"
         tools = data["result"]["tools"]
-        assert len(tools) == 18
+        assert len(tools) == 19
         assert any(t["name"] == "investigate_incident" for t in tools)
+        assert any(t["name"] == "sync_codebase" for t in tools)
 
 
 def test_e2e_superoffice_tool_dispatch_wire_flow() -> None:

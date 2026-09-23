@@ -168,13 +168,19 @@ class TestPublicObservationDTOs:
     def test_ticket_observation_fields(self):
         obs = TicketObservationDTO(
             ticket_id=42,
+            title="Database Connection Error",
             status="Open",
             category="Database",
             priority="High",
+            sanitized_description="Server threw 504 timeout",
+            sanitized_customer_reference="CUST-123",
         )
         assert obs.observation_type == "ticket"
         assert obs.ticket_id == 42
+        assert obs.title == "Database Connection Error"
         assert obs.status == "Open"
+        assert obs.sanitized_description == "Server threw 504 timeout"
+        assert obs.sanitized_customer_reference == "CUST-123"
 
         # Extra fields forbidden
         with pytest.raises(ValidationError):
@@ -183,7 +189,7 @@ class TestPublicObservationDTOs:
                 status="Open",
                 category="Database",
                 priority="High",
-                sanitized_description="leak",  # type: ignore[call-arg]
+                forbidden_extra_field="leak",  # type: ignore[call-arg]
             )
 
     def test_database_health_observation_fields(self):

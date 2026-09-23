@@ -49,11 +49,12 @@ def sample_security_context() -> SecurityContext:
 
 
 def test_schema_map_resolution() -> None:
-    """get_tool_schema_map returns dict covering all 17 approved tools."""
+    """get_tool_schema_map returns dict covering all 19 approved tools."""
     schema_map = get_tool_schema_map()
-    assert len(schema_map) == 18
+    assert len(schema_map) == 19
     assert "investigate_incident" in schema_map
     assert "get_ticket" in schema_map
+    assert "sync_codebase" in schema_map
 
 
 def test_validate_3way_tool_inventory_unrouted_backend() -> None:

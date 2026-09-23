@@ -209,6 +209,12 @@ class SuperOfficeRestClient(SuperOfficeClient):
         }
 
         filters: list[str] = []
+        if criteria.title:
+            escaped_title = escape_archive_string_literal(criteria.title)
+            filters.append(f"title contains '{escaped_title}'")
+        if criteria.category:
+            escaped_category = escape_archive_string_literal(criteria.category)
+            filters.append(f"category/name = '{escaped_category}'")
         if criteria.status:
             escaped_status = escape_archive_string_literal(criteria.status)
             filters.append(f"ticketStatus/name = '{escaped_status}'")
@@ -257,6 +263,9 @@ class SuperOfficeRestClient(SuperOfficeClient):
         if criteria.name:
             escaped_name = escape_archive_string_literal(criteria.name)
             filters.append(f"name contains '{escaped_name}'")
+        if criteria.category:
+            escaped_category = escape_archive_string_literal(criteria.category)
+            filters.append(f"category/name = '{escaped_category}'")
         if criteria.company_id is not None:
             filters.append(f"contactId = {criteria.company_id}")
 

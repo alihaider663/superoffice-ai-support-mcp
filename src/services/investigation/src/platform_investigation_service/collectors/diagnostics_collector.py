@@ -15,7 +15,9 @@ Atomic source semantics:
 Import policy: NO server runtime/adapter imports. Uses port protocol and contract DTOs only.
 """
 
+import asyncio
 from datetime import UTC, datetime
+from typing import Any
 
 from platform_investigation.models import (
     CorrelationReference,
@@ -102,134 +104,41 @@ class DiagnosticsEvidenceCollector:
         evidence_items: list[DiagnosticEvidence] = []
         now = datetime.now(UTC)
 
-        # 1. Database health check
+        tasks: list[Any] = []
         if self._selection.include_database_health:
-            try:
-                health = await self._service.get_database_health()
-            except Exception:
-                logger.error(
-                    "Database health check failed",
-                    error_code="DIAG_HEALTH_FAILED",
-                )
-                return SourceCollectionResult(
-                    source_type=self.source_type,
-                    status=SourceCollectionStatus.FAILED,
-                    evidence=(),
-                    error_code="DIAGNOSTICS_RETRIEVAL_FAILED",
-                    error_message="An unexpected error occurred retrieving MSSQL diagnostics data.",
-                )
+            tasks.append(self._service.get_database_health())
+        else:
+            tasks.append(None)
 
-            ts = health.collected_at if isinstance(health.collected_at, datetime) else now
-            evidence_items.append(
-                DiagnosticEvidence(
-                    evidence_id=f"diag:health:{investigation_id}",
-                    source_type=self.source_type,
-                    title="Database health observation",
-                    timestamp=ts,
-                    data={
-                        "is_healthy": health.is_healthy,
-                        "active_connections": health.active_connections,
-                        "latency_ms": health.latency_ms,
-                    },
-                    tags=("diagnostics", "database", "health"),
-                )
-            )
-
-        # 2. Deadlock search
         if self._selection.deadlock_criteria is not None:
-            try:
-                deadlock_result = await self._service.find_deadlocks(
-                    self._selection.deadlock_criteria
-                )
-            except Exception:
-                logger.error(
-                    "Deadlock search failed",
-                    error_code="DIAG_DEADLOCK_FAILED",
-                )
-                return SourceCollectionResult(
-                    source_type=self.source_type,
-                    status=SourceCollectionStatus.FAILED,
-                    evidence=(),
-                    error_code="DIAGNOSTICS_RETRIEVAL_FAILED",
-                    error_message="An unexpected error occurred retrieving MSSQL diagnostics data.",
-                )
+            tasks.append(self._service.find_deadlocks(self._selection.deadlock_criteria))
+        else:
+            tasks.append(None)
 
-            for deadlock_item in deadlock_result.items:
-                deadlock_ts = (
-                    deadlock_item.occurred_at
-                    if isinstance(deadlock_item.occurred_at, datetime)
-                    else now
-                )
-                evidence_items.append(
-                    DiagnosticEvidence(
-                        evidence_id=f"diag:deadlock:{deadlock_item.deadlock_id}",
-                        source_type=self.source_type,
-                        title="Database deadlock observation",
-                        timestamp=deadlock_ts,
-                        data={
-                            "deadlock_id": deadlock_item.deadlock_id,
-                            "victim_session_id": deadlock_item.victim_session_id,
-                            "participating_session_count": (
-                                deadlock_item.participating_session_count
-                            ),
-                        },
-                        tags=("diagnostics", "database", "deadlock"),
-                        correlation_references=(
-                            CorrelationReference(
-                                namespace="deadlock_id",
-                                value=deadlock_item.deadlock_id,
-                            ),
-                        ),
-                    )
-                )
-
-        # 3. Slow query search
         if self._selection.slow_query_criteria is not None:
-            try:
-                slow_query_result = await self._service.find_slow_queries(
-                    self._selection.slow_query_criteria
-                )
-            except Exception:
-                logger.error(
-                    "Slow query search failed",
-                    error_code="DIAG_SLOW_QUERY_FAILED",
-                )
-                return SourceCollectionResult(
-                    source_type=self.source_type,
-                    status=SourceCollectionStatus.FAILED,
-                    evidence=(),
-                    error_code="DIAGNOSTICS_RETRIEVAL_FAILED",
-                    error_message="An unexpected error occurred retrieving MSSQL diagnostics data.",
-                )
+            tasks.append(self._service.find_slow_queries(self._selection.slow_query_criteria))
+        else:
+            tasks.append(None)
 
-            for idx, slow_item in enumerate(slow_query_result.items):
-                query_ts = (
-                    slow_item.last_execution_time
-                    if isinstance(slow_item.last_execution_time, datetime)
-                    else now
-                )
-                evidence_items.append(
-                    DiagnosticEvidence(
-                        evidence_id=f"diag:slow_query:{slow_item.query_hash}:{idx}",
-                        source_type=self.source_type,
-                        title="Slow query observation",
-                        timestamp=query_ts,
-                        data={
-                            "query_hash": slow_item.query_hash,
-                            "duration_ms": slow_item.duration_ms,
-                            "cpu_time_ms": slow_item.cpu_time_ms,
-                            "logical_reads": slow_item.logical_reads,
-                            "execution_count": slow_item.execution_count,
-                        },
-                        tags=("diagnostics", "database", "slow_query"),
-                        correlation_references=(
-                            CorrelationReference(
-                                namespace="query_hash",
-                                value=slow_item.query_hash,
-                            ),
-                        ),
-                    )
-                )
+        async def _run_optional_task(task_coro: Any) -> Any:
+            if task_coro is None:
+                return None
+            return await task_coro
+
+        raw_results = await asyncio.gather(
+            *[_run_optional_task(t) for t in tasks],
+            return_exceptions=True,
+        )
+
+        health_res, deadlock_res, slow_query_res = raw_results
+
+        err_result = self._check_task_errors(health_res, deadlock_res, slow_query_res)
+        if err_result is not None:
+            return err_result
+
+        evidence_items = self._map_results(
+            investigation_id, now, health_res, deadlock_res, slow_query_res
+        )
 
         logger.info(
             "Diagnostics evidence collected",
@@ -242,3 +151,111 @@ class DiagnosticsEvidenceCollector:
             evidence=tuple(evidence_items),
             collected_at=now,
         )
+
+    def _build_failure_result(self) -> SourceCollectionResult:
+        return SourceCollectionResult(
+            source_type=self.source_type,
+            status=SourceCollectionStatus.FAILED,
+            evidence=(),
+            error_code="DIAGNOSTICS_RETRIEVAL_FAILED",
+            error_message="An unexpected error occurred retrieving MSSQL diagnostics data.",
+        )
+
+    def _check_task_errors(
+        self,
+        health_res: Any,
+        deadlock_res: Any,
+        slow_query_res: Any,
+    ) -> SourceCollectionResult | None:
+        if isinstance(health_res, Exception):
+            logger.error("Database health check failed", error_code="DIAG_HEALTH_FAILED")
+            return self._build_failure_result()
+        if isinstance(deadlock_res, Exception):
+            logger.error("Deadlock search failed", error_code="DIAG_DEADLOCK_FAILED")
+            return self._build_failure_result()
+        if isinstance(slow_query_res, Exception):
+            logger.error("Slow query search failed", error_code="DIAG_SLOW_QUERY_FAILED")
+            return self._build_failure_result()
+        return None
+
+    def _map_results(
+        self,
+        investigation_id: str,
+        now: datetime,
+        health_res: Any,
+        deadlock_res: Any,
+        slow_query_res: Any,
+    ) -> list[DiagnosticEvidence]:
+        items: list[DiagnosticEvidence] = []
+        if health_res is not None:
+            ts = health_res.collected_at if isinstance(health_res.collected_at, datetime) else now
+            items.append(
+                DiagnosticEvidence(
+                    evidence_id=f"diag:health:{investigation_id}",
+                    source_type=self.source_type,
+                    title="Database health observation",
+                    timestamp=ts,
+                    data={
+                        "is_healthy": health_res.is_healthy,
+                        "active_connections": health_res.active_connections,
+                        "latency_ms": health_res.latency_ms,
+                    },
+                    tags=("diagnostics", "database", "health"),
+                )
+            )
+
+        if deadlock_res is not None:
+            for dlk in deadlock_res.items:
+                dlk_ts = dlk.occurred_at if isinstance(dlk.occurred_at, datetime) else now
+                items.append(
+                    DiagnosticEvidence(
+                        evidence_id=f"diag:deadlock:{dlk.deadlock_id}",
+                        source_type=self.source_type,
+                        title="Database deadlock observation",
+                        timestamp=dlk_ts,
+                        data={
+                            "deadlock_id": dlk.deadlock_id,
+                            "victim_session_id": dlk.victim_session_id,
+                            "participating_session_count": dlk.participating_session_count,
+                        },
+                        tags=("diagnostics", "database", "deadlock"),
+                        correlation_references=(
+                            CorrelationReference(
+                                namespace="deadlock_id",
+                                value=dlk.deadlock_id,
+                            ),
+                        ),
+                    )
+                )
+
+        if slow_query_res is not None:
+            for idx, sq in enumerate(slow_query_res.items):
+                sq_ts = (
+                    sq.last_execution_time
+                    if isinstance(sq.last_execution_time, datetime)
+                    else now
+                )
+                items.append(
+                    DiagnosticEvidence(
+                        evidence_id=f"diag:slow_query:{sq.query_hash}:{idx}",
+                        source_type=self.source_type,
+                        title="Slow query observation",
+                        timestamp=sq_ts,
+                        data={
+                            "query_hash": sq.query_hash,
+                            "duration_ms": sq.duration_ms,
+                            "cpu_time_ms": sq.cpu_time_ms,
+                            "logical_reads": sq.logical_reads,
+                            "execution_count": sq.execution_count,
+                        },
+                        tags=("diagnostics", "database", "slow_query"),
+                        correlation_references=(
+                            CorrelationReference(
+                                namespace="query_hash",
+                                value=sq.query_hash,
+                            ),
+                        ),
+                    )
+                )
+
+        return items

@@ -1,5 +1,6 @@
 """Diagnostics MCP Server FastMCP runtime application exposing /mcp tools."""
 
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
@@ -96,7 +97,10 @@ def create_diagnostics_mcp_server(
 
     @mcp_server.tool(
         name="get_ticket_diagnostic_record",
-        description="Get diagnostic database records for a ticket (BLOCKED: awaiting schema)",
+        description=(
+            "Get diagnostic database records for a ticket (BLOCKED: awaiting schema "
+            "verification. Do not call or retry calling this tool)."
+        ),
     )
     async def get_ticket_diagnostic_record(ticket_id: int) -> dict[str, Any]:
         if app_service is not None:
@@ -111,7 +115,10 @@ def create_diagnostics_mcp_server(
 
     @mcp_server.tool(
         name="search_logs",
-        description="Search application and API log entries",
+        description=(
+            "Search application and API log entries (BLOCKED: Log backend is unconfigured "
+            "in this environment. Do not call or retry calling this tool)."
+        ),
     )
     async def search_logs(query: str, limit: int = 20) -> dict[str, Any]:
         if app_service is None:
@@ -132,7 +139,7 @@ def create_diagnostics_mcp_server(
         ),
     )
     async def find_deadlocks(
-        hours_back: int = 24,  # noqa: ARG001
+        hours_back: int = 24,
         limit: int = 10,
     ) -> dict[str, Any]:
         if app_service is None:
@@ -140,7 +147,8 @@ def create_diagnostics_mcp_server(
                 "Diagnostics database service is not configured or unavailable.",
                 error_code="DIAGNOSTICS_SERVICE_UNCONFIGURED",
             )
-        criteria = DeadlockCriteriaDTO(limit=limit)
+        start_time = datetime.now(UTC) - timedelta(hours=hours_back) if hours_back > 0 else None
+        criteria = DeadlockCriteriaDTO(limit=limit, start_time=start_time)
         res = await app_service.find_deadlocks(criteria)
         return res.model_dump(mode="json")
 

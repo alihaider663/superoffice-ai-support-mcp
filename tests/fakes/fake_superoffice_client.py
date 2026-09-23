@@ -59,6 +59,10 @@ class FakeSuperOfficeClient:
         """Search tickets matching criteria with in-memory pagination."""
         matched: list[TicketSummaryDomainDTO] = []
         for ticket in self._tickets.values():
+            if criteria.title and criteria.title.lower() not in ticket.title.lower():
+                continue
+            if criteria.category and criteria.category.lower() not in ticket.category.lower():
+                continue
             if criteria.status and ticket.status.lower() != criteria.status.lower():
                 continue
             cat_id = getattr(ticket, "category_id", None)
@@ -111,6 +115,9 @@ class FakeSuperOfficeClient:
             if criteria.company_id is not None and comp.company_id != criteria.company_id:
                 continue
             if criteria.name and criteria.name.lower() not in comp.name.lower():
+                continue
+            comp_cat = str(getattr(comp, "category", "")).lower()
+            if criteria.category and comp_cat and criteria.category.lower() not in comp_cat:
                 continue
             matched.append(comp)
 

@@ -109,6 +109,11 @@ def create_default_routing_table() -> GatewayRoutingTable:
             target_server=TargetServer.SUPEROFFICE,
             endpoint_path="/mcp",
         ),
+        ToolRouteDefinition(
+            tool_name="sync_codebase",
+            target_server=TargetServer.SUPEROFFICE,
+            endpoint_path="/mcp",
+        ),
         # Diagnostics MCP Tools (L2 & L3)
         ToolRouteDefinition(
             tool_name="get_database_health",

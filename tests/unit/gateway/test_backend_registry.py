@@ -66,8 +66,12 @@ def test_default_routing_table_contains_all_domains() -> None:
     assert table.has_route("investigate_incident")
     assert table.get_route("investigate_incident").target_server == TargetServer.INVESTIGATION
 
-    # Assert 18 total approved routes
-    assert len(table.routes) == 18
+    # SuperOffice Codebase Sync
+    assert table.has_route("sync_codebase")
+    assert table.get_route("sync_codebase").target_server == TargetServer.SUPEROFFICE
+
+    # Assert 19 total approved routes
+    assert len(table.routes) == 19
 
 
 def test_validate_routes_against_rbac_detects_missing_tool() -> None:

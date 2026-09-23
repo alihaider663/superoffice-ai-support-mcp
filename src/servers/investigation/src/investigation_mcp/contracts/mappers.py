@@ -250,9 +250,12 @@ class InvestigationResponseMapper:
         ):
             ticket_dto = TicketObservationDTO(
                 ticket_id=data["ticket_id"],
+                title=data.get("title"),
                 status=data["status"],
                 category=data["category"],
                 priority=data["priority"],
+                sanitized_description=data.get("sanitized_description"),
+                sanitized_customer_reference=data.get("sanitized_customer_reference"),
             )
             return "superoffice_crm", ticket_dto
 

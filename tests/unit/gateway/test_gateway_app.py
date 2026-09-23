@@ -151,8 +151,9 @@ def test_mcp_tools_list_method(test_client: TestClient) -> None:
     assert res.status_code == 200
     data = _parse_mcp_response(res)
     tools = data["result"]["tools"]
-    assert len(tools) == 18
+    assert len(tools) == 19
     assert any(t["name"] == "investigate_incident" for t in tools)
+    assert any(t["name"] == "sync_codebase" for t in tools)
     tool_map = {t["name"]: t for t in tools}
 
     # Verify Knowledge schema
