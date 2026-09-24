@@ -134,13 +134,13 @@ To guarantee security and data minimization, each backend data source is exclusi
 
 ---
 
-## 5. Canonical Public Tool Inventory (Total 18)
+## 5. Canonical Public Tool Inventory (Total 23)
 
-The platform exposes exactly **18 canonical public tools** registered at the Gateway perimeter. There are zero aliases and zero public ingestion tools.
+The platform exposes exactly **23 canonical public tools** registered at the Gateway perimeter. There are zero aliases and zero public ingestion tools.
 
 ```text
-SuperOffice MCP (8)    Diagnostics MCP (6)    Knowledge MCP (3)    Investigation MCP (1)
-───────────────────    ───────────────────    ─────────────────    ─────────────────────
+SuperOffice MCP (13)   Diagnostics MCP (6)    Knowledge MCP (3)    Investigation MCP (1)
+────────────────────   ───────────────────    ─────────────────    ─────────────────────
 get_ticket             get_database_health    search_knowledge     investigate_incident
 search_tickets         find_slow_queries      get_runbook
 get_ticket_messages    find_deadlocks         find_known_issues
@@ -149,6 +149,11 @@ get_company            search_logs
 find_companies         get_ticket_diagnostic_record
 get_person
 find_persons
+sync_codebase
+list_extra_tables
+get_extra_table_schema
+query_extra_table
+get_ticket_audit_trail
 ```
 
 - **Infrastructure MCP**: 0 public tools (structural slot retained; implementation deferred under Decision `D07`).
@@ -505,7 +510,7 @@ The following configuration choices are approved **strictly for local developmen
 | **D08 External AI Live CRM Boundary** | `OPEN / ENFORCED` | Requires organizational Data Protection Impact Assessment (DPIA) & compliance sign-off | PR.3 / PR.10 |
 | **Investigation → `search_logs` Integration** | `DEFERRED` | Application log collection requires safe correlation key indexing | PR.6 |
 | **Investigation → `Knowledge` Integration** | `NOT_CONFIGURED / DEFERRED` | Automatic RAG injection into incident investigation requires tuning | Post-Release 1.0 |
-| **`get_ticket_diagnostic_record` Tool** | `BLOCKED` | Database table/view names and foreign key relationships unverified by DBA | Schema Verification |
+| **`get_ticket_diagnostic_record` Tool** | `RESOLVED / ACTIVE` | Unblocked via verified queries against ticket_log and ticket_log_action | Phase 3 |
 | **Production Deployment & Network Trust** | `NOT STARTED` | Production topology, service isolation, network policy, and service-to-service trust mechanisms have not yet been selected and validated | PR.0 / PR.1 / PR.3 / PR.4 |
 | **Remote Diagnostics Agent Placement** | `NOT STARTED` | Multi-host or remote agent topology requires network boundary evaluation | PR.1 |
 | **Infrastructure MCP Tool Implementation** | `DEFERRED` | Detailed host OS probe capabilities deferred under D07 | PR.1 / PR.2 |
@@ -570,7 +575,7 @@ Following the completion of Local Development Release 1.0, the project will prog
 The local platform has been comprehensively verified and validated across all unit, integration, and security test suites:
 
 - **Full Platform Regression Suite**:
-  - **Passed**: `1118` tests (expanded from 1,043 across 4 test phases)
+  - **Passed**: `1142` tests (expanded across Phase 1, Phase 2, and Phase 3)
   - **Skipped**: `11` tests (opt-in live database mutation tests guarded by environment variables)
   - **Failed**: `0`
 - **Focused Security & Contract Suite (FLC.2)**:

@@ -523,8 +523,8 @@ async def test_official_mcp_tools_list_discovery_and_schema_fidelity() -> None:
             tools_result = await session.list_tools()
             tools: list[Tool] = tools_result.tools
 
-            # Assert exactly 19 active Gateway tools
-            assert len(tools) == 19
+            # Assert exactly 23 active Gateway tools
+            assert len(tools) == 23
 
             # Assert investigate_incident is present exactly once
             inv_tools = [t for t in tools if t.name == "investigate_incident"]

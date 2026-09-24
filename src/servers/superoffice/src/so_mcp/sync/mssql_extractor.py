@@ -23,7 +23,7 @@ from so_mcp.sync.contracts import (
 logger = logging.getLogger(__name__)
 
 
-def create_mssql_sync_engine(
+def create_mssql_sync_engine(  # noqa: PLR0917
     host: str = "localhost",
     port: int = 1433,
     database: str = "SuperOffice",
@@ -283,9 +283,7 @@ class SuperOfficeMssqlExtractor:
     async def fetch_extra_tables(self) -> list[ExtraTableSchemaDTO]:
         """Fetch custom extra tables and extra fields."""
         t_sql = text(
-            "SELECT id, table_name, name, description "
-            "FROM dbo.extra_tables "
-            "ORDER BY id ASC;"
+            "SELECT id, table_name, name, description FROM dbo.extra_tables ORDER BY id ASC;"
         )
         f_sql = text(
             "SELECT id, extra_table, field_name, name, type, default_value, description "

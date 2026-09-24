@@ -3,7 +3,7 @@
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
 [![MCP Official SDK](https://img.shields.io/badge/MCP-Official%20SDK-orange.svg)](https://modelcontextprotocol.io/)
 [![Status](https://img.shields.io/badge/Status-Local%20Development%20Release%201.0-brightgreen.svg)]()
-[![Regression Tests](https://img.shields.io/badge/Tests-1118%20Passed-success.svg)]()
+[![Regression Tests](https://img.shields.io/badge/Tests-1142%20Passed-success.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 An enterprise-grade, secure, modular Model Context Protocol (MCP) platform for AI-assisted SuperOffice CRM support triage, diagnostic telemetry, and cross-system incident investigation.
@@ -81,9 +81,9 @@ Each backend is exclusively owned by a single service boundary. External AI mode
 
 ---
 
-## Canonical Public Tool Inventory (18 Tools)
+## Canonical Public Tool Inventory (23 Tools)
 
-The Gateway exposes exactly **18 registered public tools** over Streamable HTTP ([ADR 007](docs/adr/007-gateway-protocol-selection.md)). There are zero aliases and zero public ingestion tools.
+The Gateway exposes exactly **23 registered public tools** over Streamable HTTP ([ADR 007](docs/adr/007-gateway-protocol-selection.md)). There are zero aliases and zero public ingestion tools.
 
 | Server | Tool Name | Minimum Role | Classification | Data Level | Description |
 | :--- | :--- | :---: | :---: | :---: | :--- |
@@ -95,12 +95,17 @@ The Gateway exposes exactly **18 registered public tools** over Streamable HTTP 
 | | `find_companies` | L1 | `READ_ONLY` | `INTERNAL` | Search company directory |
 | | `get_person` | L1 | `READ_ONLY` | `INTERNAL` | Retrieve contact person details (PII redacted) |
 | | `find_persons` | L1 | `READ_ONLY` | `INTERNAL` | Search contact persons |
+| | `sync_codebase` | L2 | `READ_ONLY` | `INTERNAL` | Mirror CRMScripts, screens, and database schemas locally |
+| | `list_extra_tables` | L2 | `READ_ONLY` | `INTERNAL` | List user-defined `y_*` extra tables |
+| | `get_extra_table_schema` | L2 | `READ_ONLY` | `INTERNAL` | Retrieve column schema and types for extra tables |
+| | `query_extra_table` | L2 | `READ_ONLY` | `CONFIDENTIAL` | Bounded, parameterized read queries on extra tables |
+| | `get_ticket_audit_trail` | L2 | `READ_ONLY` | `CONFIDENTIAL` | Chronological ticket audit trail, actions, and field changes |
 | **Diagnostics MCP** | `get_database_health` | L2 | `READ_ONLY` | `CONFIDENTIAL` | Database health, DMV checks, uptime metrics |
 | | `find_slow_queries` | L2 | `READ_ONLY` | `CONFIDENTIAL` | Identify top slow queries (max 50 rows, 5s timeout) |
 | | `find_deadlocks` | L2 | `READ_ONLY` | `CONFIDENTIAL` | Parse deadlock graphs from system_health ring buffer |
 | | `find_blocking_sessions`| L2 | `READ_ONLY` | `CONFIDENTIAL` | Analyze active blocking and wait resource chains |
 | | `search_logs` | L2 | `READ_ONLY` | `CONFIDENTIAL` | Search IIS W3C & SuperOffice warning logs (config-conditional) |
-| | `get_ticket_diagnostic_record` | L2 | `READ_ONLY` | `CONFIDENTIAL` | Database diagnostic records (registered / blocked) |
+| | `get_ticket_diagnostic_record` | L2 | `READ_ONLY` | `CONFIDENTIAL` | Database diagnostic records (active / live telemetry) |
 | **Knowledge MCP** | `search_knowledge` | L1 | `READ_ONLY` | `INTERNAL` | Semantic vector search across technical documentation |
 | | `get_runbook` | L1 | `READ_ONLY` | `INTERNAL` | Retrieve structured operational runbook by ID |
 | | `find_known_issues` | L1 | `READ_ONLY` | `INTERNAL` | Search incident patterns and known workarounds |
@@ -108,9 +113,11 @@ The Gateway exposes exactly **18 registered public tools** over Streamable HTTP 
 
 ### Registered vs. Operational Status
 - `search_logs`: `IMPLEMENTED / CONFIGURATION-CONDITIONAL` (operational when local log directories are configured).
-- `get_ticket_diagnostic_record`: `REGISTERED / BLOCKED` (fails closed with `DIAGNOSTIC_SCHEMA_NOT_CONFIGURED` pending DBA table schema verification).
+- `get_ticket_diagnostic_record`: `ACTIVE / OPERATIONAL` (queries `ticket_log` and `ticket_log_action` with sanitized summaries).
+- `get_ticket_audit_trail`: `ACTIVE / OPERATIONAL` (queries `ticket_log`, `ticket_log_action`, `ticket_log_change`, and `ejuser`).
+- `list_extra_tables`, `get_extra_table_schema`, `query_extra_table`: `ACTIVE / OPERATIONAL` (user-defined `y_*` discovery).
 - `Knowledge tools`: `CONFIGURED / LOCAL OPERATIONAL` (backed by local PostgreSQL + pgvector and FastEmbed).
-- `investigate_incident`: Operational with exactly 4 frozen subordinate operations (`get_ticket`, `get_database_health`, `find_slow_queries`, `find_deadlocks`). Subordinate `application_logs` returns `BLOCKED` and `knowledge_base` returns `NOT_CONFIGURED`.
+- `investigate_incident`: Operational with 4 frozen subordinate operations (`get_ticket`, `get_database_health`, `find_slow_queries`, `find_deadlocks`). Subordinate `application_logs` returns `BLOCKED` and `knowledge_base` returns `NOT_CONFIGURED`.
 - `Infrastructure MCP`: 0 public tools (retained as boundary; implementation deferred under Decision D07).
 
 ---

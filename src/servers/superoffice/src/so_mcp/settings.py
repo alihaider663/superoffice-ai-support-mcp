@@ -1,9 +1,8 @@
-"""SuperOffice CRM MCP Server configuration."""
-
+import os
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
-from pydantic import Field, HttpUrl, PositiveInt, SecretStr
+from pydantic import Field, HttpUrl, PositiveInt, SecretStr, model_validator
 from pydantic_settings import SettingsConfigDict
 
 from platform_config.base import BasePlatformSettings
@@ -57,6 +56,33 @@ class SuperOfficeCodebaseSyncSettings(BasePlatformSettings):
         env_file=".env",
         extra="ignore",
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _fallback_from_diagnostics_env(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            if (not data.get("mssql_host") or data.get("mssql_host") == "localhost") and (
+                "DIAGNOSTICS_MSSQL_HOST" in os.environ
+            ):
+                data["mssql_host"] = os.environ["DIAGNOSTICS_MSSQL_HOST"]
+            if (not data.get("mssql_port") or data.get("mssql_port") == 1433) and (
+                "DIAGNOSTICS_MSSQL_PORT" in os.environ
+            ):
+                data["mssql_port"] = int(os.environ["DIAGNOSTICS_MSSQL_PORT"])
+            if (not data.get("mssql_database") or data.get("mssql_database") == "SuperOffice") and (
+                "DIAGNOSTICS_MSSQL_DATABASE" in os.environ
+            ):
+                data["mssql_database"] = os.environ["DIAGNOSTICS_MSSQL_DATABASE"]
+            if (not data.get("mssql_user") or data.get("mssql_user") == "so_readonly_user") and (
+                "DIAGNOSTICS_MSSQL_USER" in os.environ
+            ):
+                data["mssql_user"] = os.environ["DIAGNOSTICS_MSSQL_USER"]
+            if (
+                not data.get("mssql_password")
+                or str(data.get("mssql_password")) == "insecure-dev-placeholder"
+            ) and ("DIAGNOSTICS_MSSQL_PASSWORD" in os.environ):
+                data["mssql_password"] = os.environ["DIAGNOSTICS_MSSQL_PASSWORD"]
+        return data
 
     codebase_local_path: Path = Field(
         default=Path("F:/CodeBase_SuperOffice"),
@@ -117,4 +143,3 @@ class SuperOfficeCodebaseSyncSettings(BasePlatformSettings):
         default=True,
         description="Trust SQL Server certificate without CA validation",
     )
-

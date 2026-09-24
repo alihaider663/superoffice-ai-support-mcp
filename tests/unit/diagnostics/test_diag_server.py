@@ -97,15 +97,27 @@ async def test_unwired_app_service_fails_closed_no_synthetic_success() -> None:
 
 
 @pytest.mark.asyncio
-async def test_blocked_tools_remain_blocked() -> None:
-    """Verify get_ticket_diagnostic_record and search_logs remain blocked."""
+async def test_unconfigured_ticket_diagnostic_record_fails_closed() -> None:
+    """Verify unwired get_ticket_diagnostic_record fails closed."""
     server = create_diagnostics_mcp_server()
     tools = server._tool_manager._tools
 
     with pytest.raises(DatabaseDiagnosticError) as exc_info:
         await tools["get_ticket_diagnostic_record"].fn(ticket_id=123)
-    assert exc_info.value.error_code == "DIAGNOSTIC_SCHEMA_NOT_CONFIGURED"
+    assert exc_info.value.error_code == "DIAGNOSTICS_SERVICE_UNCONFIGURED"
 
     with pytest.raises(LogSearchError) as exc_info_log:
         await tools["search_logs"].fn(query="test")
     assert exc_info_log.value.error_code == "LOG_SEARCH_BACKEND_NOT_CONFIGURED"
+
+
+@pytest.mark.asyncio
+async def test_wired_ticket_diagnostic_record_executes() -> None:
+    """Verify wired get_ticket_diagnostic_record executes and returns diagnostic record."""
+    fake_repo = FakeDiagnosticRepository()
+    server = create_diagnostics_mcp_server(repository=fake_repo)
+    tools = server._tool_manager._tools
+
+    res = await tools["get_ticket_diagnostic_record"].fn(ticket_id=123)
+    assert res["ticket_id"] == 123
+    assert res["has_db_activity"] is False

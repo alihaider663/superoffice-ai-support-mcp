@@ -4,11 +4,11 @@
 
 The platform strictly separates responsibilities across dedicated MCP servers and architectural layers. Every capability has exactly one owner service.
 
-The platform registers exactly **18 canonical public tools** at the Gateway perimeter. There are zero aliases and zero public ingestion tools.
+The platform registers exactly **23 canonical public tools** at the Gateway perimeter. There are zero aliases and zero public ingestion tools.
 
 ```text
-Platform Public Inventory: 18 Tools
-├── SuperOffice MCP (8 tools)
+Platform Public Inventory: 23 Tools
+├── SuperOffice MCP (13 tools)
 ├── Diagnostics MCP (6 tools)
 ├── Knowledge MCP (3 tools)
 ├── Investigation MCP (1 tool)
@@ -20,7 +20,7 @@ Platform Public Inventory: 18 Tools
 ## 2. SuperOffice MCP Server (`so-mcp`)
 
 ### Purpose
-Provides controlled, read-only access to SuperOffice CRM entities and ticket operations via the SuperOffice REST WebAPI (v1).
+Provides controlled, read-only access to SuperOffice CRM entities and ticket operations via the SuperOffice REST WebAPI (v1) and read-only parameterized database queries for extra tables and audit trails.
 
 ### Owns
 * Ticket retrieval and filtered search
@@ -28,15 +28,18 @@ Provides controlled, read-only access to SuperOffice CRM entities and ticket ope
 * Attachment metadata (Decision D05)
 * Company entity retrieval and lookup
 * Person / contact entity retrieval with PII masking
+* User-defined `y_*` extra table discovery, schema inspection, and querying
+* Ticket lifecycle audit trail, actions, and field transition history
+* Local codebase synchronization for scripts, screens, and schemas
 
 ### Does NOT Own
-* Direct database access or SQL queries
 * Diagnostic log inspection or host metrics
 * AI reasoning or prompt synthesis
 * Raw attachment downloads (deny-by-default)
 * CRM write mutations (deferred in Local Development Release 1.0)
+* Unvalidated dynamic or arbitrary SQL queries
 
-### Canonical Public Tools (8)
+### Canonical Public Tools (13)
 1. `get_ticket`: Retrieve full ticket details by ticket ID.
 2. `search_tickets`: Filtered ticket search with strict pagination.
 3. `get_ticket_messages`: Retrieve messages / replies associated with a ticket.
@@ -45,9 +48,14 @@ Provides controlled, read-only access to SuperOffice CRM entities and ticket ope
 6. `find_companies`: Filtered search across company records.
 7. `get_person`: Retrieve contact person details with PII masking.
 8. `find_persons`: Filtered search across person records.
+9. `sync_codebase`: Synchronize SuperOffice scripts, screens, and schemas to local directory.
+10. `list_extra_tables`: Enumerate user-defined `y_*` extra tables.
+11. `get_extra_table_schema`: Inspect columns, types, and primary keys of extra tables.
+12. `query_extra_table`: Execute strictly bounded and parameterized reads on extra tables.
+13. `get_ticket_audit_trail`: Chronological ticket audit trail, actions, and field changes.
 
 ### Operational Status
-All 8 tools are **OPERATIONAL** in local development using synthetic fixtures and mock HTTP clients.
+All 13 tools are **OPERATIONAL** in local development with live MSSQL database integration and test fixtures.
 
 ### Subsystems & Alternate Runtimes
 - **Codebase Mirror & Synchronization Subsystem (`so_mcp.sync`)**:
@@ -91,7 +99,7 @@ Provides technical diagnostic evidence across database health, query execution p
 ### Operational Status
 - `get_database_health`, `find_slow_queries`, `find_deadlocks`, `find_blocking_sessions`: **OPERATIONAL** (live local SQL Server or mock repository).
 - `search_logs`: **IMPLEMENTED / CONFIGURATION-CONDITIONAL** (operational when valid log root directory is configured; fails closed if enabled source fails).
-- `get_ticket_diagnostic_record`: **REGISTERED / BLOCKED** (fails closed with `DIAGNOSTIC_SCHEMA_NOT_CONFIGURED` pending DBA table schema verification).
+- `get_ticket_diagnostic_record`: **OPERATIONAL** (live parameterized extraction against `ticket_log` and `ticket_log_action`).
 
 ---
 

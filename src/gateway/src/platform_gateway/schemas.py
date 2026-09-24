@@ -464,10 +464,12 @@ INVESTIGATE_INCIDENT_OUTPUT_SCHEMA = {
 def get_platform_tool_schemas() -> list[Tool]:
     """Return official MCP Tool definitions with complete JSON schemas for approved platform tools.
 
-    Inventory (19 Approved & Blocked Platform Tools):
+    Inventory (23 Approved Platform Tools):
     - Knowledge (3 tools): search_knowledge, get_runbook, find_known_issues
-    - SuperOffice (9 tools): get_ticket, search_tickets, get_ticket_messages, list_attachments,
-                             get_company, find_companies, get_person, find_persons, sync_codebase
+    - SuperOffice (13 tools): get_ticket, search_tickets, get_ticket_messages, list_attachments,
+                             get_company, find_companies, get_person, find_persons, sync_codebase,
+                             list_extra_tables, get_extra_table_schema, query_extra_table,
+                             get_ticket_audit_trail
     - Diagnostics (6 tools): get_database_health, find_slow_queries, get_ticket_diagnostic_record,
                              search_logs, find_deadlocks, find_blocking_sessions
     - Infrastructure (0 tools): Deferred per Decision 2A-D07
@@ -694,6 +696,130 @@ def get_platform_tool_schemas() -> list[Tool]:
                 },
             },
         ),
+        Tool(
+            name="list_extra_tables",
+            description=(
+                "List registered SuperOffice custom extra tables (y_*) "
+                "with metadata and field counts"
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "search": {
+                        "type": "string",
+                        "description": (
+                            "Optional substring filter to match against table name, "
+                            "display name, or description"
+                        ),
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="get_extra_table_schema",
+            description=(
+                "Retrieve column definitions, labels, data types, and defaults "
+                "for a specific y_* table"
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "table_name": {
+                        "type": "string",
+                        "description": "Target extra table name (e.g. 'y_subscription')",
+                    },
+                },
+                "required": ["table_name"],
+            },
+        ),
+        Tool(
+            name="query_extra_table",
+            description=(
+                "Query records from a specific SuperOffice custom extra table with "
+                "column-level filtering, projection, ordering, and pagination"
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "table_name": {
+                        "type": "string",
+                        "description": "Target extra table name (e.g. 'y_subscription')",
+                    },
+                    "fields": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": (
+                            "Specific columns to select. If omitted, selects id and all "
+                            "custom x_* fields."
+                        ),
+                    },
+                    "filters": {
+                        "type": "object",
+                        "description": (
+                            "Key-value filter mapping matching column names to desired values"
+                        ),
+                    },
+                    "order_by": {
+                        "type": "string",
+                        "description": "Column to sort by (defaults to id)",
+                        "default": "id",
+                    },
+                    "order_direction": {
+                        "type": "string",
+                        "enum": ["asc", "desc"],
+                        "description": "Sort direction ('asc' or 'desc')",
+                        "default": "asc",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 50,
+                        "description": "Maximum rows to return (1..50, default 20)",
+                        "default": 20,
+                    },
+                    "offset": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "Number of rows to skip for pagination (default 0)",
+                        "default": 0,
+                    },
+                },
+                "required": ["table_name"],
+            },
+        ),
+        Tool(
+            name="get_ticket_audit_trail",
+            description=(
+                "Retrieve the complete, chronological audit trail and change history for a "
+                "SuperOffice ticket, including high-level lifecycle events, user actions, and "
+                "granular before/after field mutations."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "ticket_id": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "Ticket ID to retrieve audit trail for",
+                    },
+                    "include_field_changes": {
+                        "type": "boolean",
+                        "description": (
+                            "Whether to include granular field transitions (default: true)"
+                        ),
+                        "default": True,
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 100,
+                        "description": "Maximum action records to return (1..100, default 50)",
+                        "default": 50,
+                    },
+                },
+                "required": ["ticket_id"],
+            },
+        ),
         # Diagnostics MCP Tools (L2 & L3)
         Tool(
             name="get_database_health",
@@ -742,15 +868,15 @@ def get_platform_tool_schemas() -> list[Tool]:
         Tool(
             name="get_ticket_diagnostic_record",
             description=(
-                "Get diagnostic database records for a ticket (BLOCKED: Awaiting schema "
-                "verification. Do not call or retry calling this tool; use investigate_incident "
-                "or get_ticket instead)."
+                "Inspect database-level diagnostic activity and update telemetry for a ticket, "
+                "verifying database recording state, activity counts, and recent mutations."
             ),
             inputSchema={
                 "type": "object",
                 "properties": {
                     "ticket_id": {
                         "type": "integer",
+                        "minimum": 1,
                         "description": "Ticket ID to query database records for",
                     },
                 },

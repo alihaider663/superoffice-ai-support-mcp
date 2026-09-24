@@ -114,6 +114,26 @@ def create_default_routing_table() -> GatewayRoutingTable:
             target_server=TargetServer.SUPEROFFICE,
             endpoint_path="/mcp",
         ),
+        ToolRouteDefinition(
+            tool_name="list_extra_tables",
+            target_server=TargetServer.SUPEROFFICE,
+            endpoint_path="/mcp",
+        ),
+        ToolRouteDefinition(
+            tool_name="get_extra_table_schema",
+            target_server=TargetServer.SUPEROFFICE,
+            endpoint_path="/mcp",
+        ),
+        ToolRouteDefinition(
+            tool_name="query_extra_table",
+            target_server=TargetServer.SUPEROFFICE,
+            endpoint_path="/mcp",
+        ),
+        ToolRouteDefinition(
+            tool_name="get_ticket_audit_trail",
+            target_server=TargetServer.SUPEROFFICE,
+            endpoint_path="/mcp",
+        ),
         # Diagnostics MCP Tools (L2 & L3)
         ToolRouteDefinition(
             tool_name="get_database_health",

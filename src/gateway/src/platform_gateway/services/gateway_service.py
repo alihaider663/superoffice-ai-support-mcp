@@ -236,4 +236,3 @@ class GatewayApplicationService:
         """Gracefully release gateway resources including connection pools."""
         if hasattr(self._dispatcher, "aclose"):
             await self._dispatcher.aclose()
-

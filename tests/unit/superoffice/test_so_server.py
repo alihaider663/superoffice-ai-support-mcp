@@ -5,8 +5,19 @@ from unittest.mock import AsyncMock
 import pytest
 from starlette.testclient import TestClient
 
+from so_mcp.audit.contracts import (
+    TicketActionItemDTO,
+    TicketAuditTrailDTO,
+    TicketLogMilestoneDTO,
+)
 from so_mcp.contracts.dtos import TicketDetailDomainDTO
 from so_mcp.contracts.errors import SuperOfficeIntegrationError
+from so_mcp.extra_tables.contracts import (
+    ExtraFieldDefinitionDTO,
+    ExtraTableDetailSchemaDTO,
+    ExtraTableQueryResultDTO,
+    ExtraTableSummaryDTO,
+)
 from so_mcp.server import create_app, create_superoffice_mcp_server
 from so_mcp.sync.contracts import SyncManifestDTO, SyncResultDTO
 from tests.fakes.fake_superoffice_client import FakeSuperOfficeClient
@@ -26,6 +37,10 @@ def test_so_server_registers_all_approved_tools() -> None:
         "get_person",
         "find_persons",
         "sync_codebase",
+        "list_extra_tables",
+        "get_extra_table_schema",
+        "query_extra_table",
+        "get_ticket_audit_trail",
     }
     assert tool_names == expected_tools
 
@@ -165,3 +180,110 @@ async def test_so_server_sync_codebase_invocation(tmp_path) -> None:
     assert res["manifest"]["total_scripts"] == 3
     mock_sync_service.sync.assert_called_once_with(mode="http", tables=None, dry_run=True)
 
+
+@pytest.mark.asyncio
+async def test_so_server_extra_tables_tools_invocation() -> None:
+    """SuperOffice FastMCP server invokes extra table tools with mocked service."""
+    mock_extra_service = AsyncMock()
+    mock_extra_service.list_extra_tables.return_value = [
+        ExtraTableSummaryDTO(
+            id=1,
+            table_name="y_subscription",
+            display_name="Subscription",
+            description="Subs",
+            field_count=2,
+        )
+    ]
+    mock_extra_service.get_extra_table_schema.return_value = ExtraTableDetailSchemaDTO(
+        id=1,
+        table_name="y_subscription",
+        display_name="Subscription",
+        description="Subs",
+        fields=(
+            ExtraFieldDefinitionDTO(
+                id=1,
+                extra_table_id=1,
+                field_name="x_msisdn",
+                display_name="MSISDN",
+                type_code=10,
+                type_name="string",
+            ),
+        ),
+    )
+    mock_extra_service.query_extra_table.return_value = ExtraTableQueryResultDTO(
+        table_name="y_subscription",
+        total_rows_returned=1,
+        limit=20,
+        offset=0,
+        columns=("id", "x_msisdn"),
+        rows=({"id": 1, "x_msisdn": "12345678"},),
+    )
+
+    server = create_superoffice_mcp_server(extra_table_service=mock_extra_service)
+    tools = server._tool_manager._tools
+
+    # 1. list_extra_tables
+    tables_res = await tools["list_extra_tables"].fn(search="sub")
+    assert tables_res["total_count"] == 1
+    assert tables_res["tables"][0]["table_name"] == "y_subscription"
+    mock_extra_service.list_extra_tables.assert_called_once_with(search="sub")
+
+    # 2. get_extra_table_schema
+    schema_res = await tools["get_extra_table_schema"].fn(table_name="y_subscription")
+    assert schema_res["table_name"] == "y_subscription"
+    assert len(schema_res["fields"]) == 1
+
+    # 3. query_extra_table
+    query_res = await tools["query_extra_table"].fn(
+        table_name="y_subscription",
+        fields=["x_msisdn"],
+        filters={"x_msisdn": "12345678"},
+        limit=10,
+    )
+    assert query_res["total_rows_returned"] == 1
+    assert query_res["rows"][0]["x_msisdn"] == "12345678"
+
+
+@pytest.mark.asyncio
+async def test_so_server_audit_trail_tools_invocation() -> None:
+    """SuperOffice FastMCP server invokes get_ticket_audit_trail on TicketAuditService."""
+    mock_audit_service = AsyncMock()
+    mock_audit_service.get_ticket_audit_trail.return_value = TicketAuditTrailDTO(
+        ticket_id=10209,
+        milestone_logs=(
+            TicketLogMilestoneDTO(
+                id=1,
+                occurred_at=None,
+                actor="junaid.tariq",
+                event_code=37,
+                description="New request created",
+            ),
+        ),
+        actions=(
+            TicketActionItemDTO(
+                action_id=10,
+                occurred_at=None,
+                actor="junaid.tariq",
+                user_id=1606,
+                customer_id=-1,
+                action_code=13,
+                action_name="Ticket updated",
+                description="Status changed",
+                details=None,
+                changes=(),
+            ),
+        ),
+        total_milestones=1,
+        total_actions=1,
+        total_changes=0,
+    )
+
+    server = create_superoffice_mcp_server(audit_service=mock_audit_service)
+    tools = server._tool_manager._tools
+
+    res = await tools["get_ticket_audit_trail"].fn(ticket_id=10209)
+    assert res["ticket_id"] == 10209
+    assert res["total_milestones"] == 1
+    assert res["total_actions"] == 1
+    assert res["milestone_logs"][0]["actor"] == "junaid.tariq"
+    mock_audit_service.get_ticket_audit_trail.assert_called_once()

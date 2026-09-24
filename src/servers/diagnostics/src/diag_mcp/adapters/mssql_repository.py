@@ -739,16 +739,83 @@ class MssqlDiagnosticRepository(DiagnosticRepository):
     async def get_ticket_diagnostic_record(
         self, criteria: TicketDiagnosticCriteriaDTO
     ) -> TicketDiagnosticRecordDomainDTO | None:
-        """Fetch ticket-scoped diagnostic record.
+        """Fetch ticket-scoped diagnostic record from ticket_log and ticket_log_action."""
+        ticket_id = criteria.ticket_id
 
-        Fails closed with DIAGNOSTIC_SCHEMA_NOT_CONFIGURED because SuperOffice
-        database diagnostic event schema is not yet verified.
-        """
-        raise DatabaseDiagnosticError(
-            message=(
-                "Ticket diagnostic database schema mapping is not verified or configured. "
-                "Operation blocked pending SuperOffice diagnostic table/view specification."
-            ),
-            error_code="DIAGNOSTIC_SCHEMA_NOT_CONFIGURED",
-            details={"ticket_id": criteria.ticket_id},
+        stats_sql = text("""
+            SELECT
+                (SELECT COUNT(*) FROM dbo.ticket_log WHERE ticket_id = :ticket_id),
+                (SELECT COUNT(*) FROM dbo.ticket_log_action WHERE ticket_id = :ticket_id),
+                (SELECT MAX(log_when) FROM dbo.ticket_log WHERE ticket_id = :ticket_id),
+                (SELECT MAX(log_when) FROM dbo.ticket_log_action WHERE ticket_id = :ticket_id);
+        """)
+
+        latest_actor_sql = text("""
+            SELECT TOP 1
+                a.log_when,
+                COALESCE(u.loginname, u.username, CAST(a.user_id AS VARCHAR(32))) AS actor
+            FROM dbo.ticket_log_action a
+            LEFT JOIN dbo.ejuser u ON a.user_id = u.id
+            WHERE a.ticket_id = :ticket_id
+            ORDER BY a.log_when DESC, a.id DESC;
+        """)
+
+        try:
+            async with self._engine.connect() as conn:
+                stats_row = (await conn.execute(stats_sql, {"ticket_id": ticket_id})).fetchone()
+                actor_row = (
+                    await conn.execute(latest_actor_sql, {"ticket_id": ticket_id})
+                ).fetchone()
+        except Exception as exc:
+            self._handle_exception(exc, "get_ticket_diagnostic_record")
+
+        if not stats_row:
+            return TicketDiagnosticRecordDomainDTO(
+                ticket_id=ticket_id,
+                has_db_activity=False,
+                recent_error_count=0,
+                last_activity_time=None,
+                diagnostic_summary=f"No database diagnostic records found for ticket #{ticket_id}.",
+            )
+
+        log_count = int(stats_row[0] or 0)
+        action_count = int(stats_row[1] or 0)
+        max_log_time = stats_row[2] if isinstance(stats_row[2], datetime) else None
+        max_action_time = stats_row[3] if isinstance(stats_row[3], datetime) else None
+
+        has_activity = (log_count > 0) or (action_count > 0)
+
+        # Determine latest activity time
+        latest_time: datetime | None = None
+        if max_log_time and max_action_time:
+            latest_time = max(max_log_time, max_action_time)
+        else:
+            latest_time = max_log_time or max_action_time
+
+        if latest_time is not None:
+            latest_time = latest_time if latest_time.tzinfo else latest_time.replace(tzinfo=UTC)
+
+        actor_name = str(actor_row[1]) if actor_row and actor_row[1] else None
+        actor_suffix = f" by {actor_name}" if actor_name else ""
+
+        if has_activity:
+            time_str = (
+                latest_time.strftime("%Y-%m-%d %H:%M:%S UTC") if latest_time else "unknown time"
+            )
+            summary = (
+                f"Ticket #{ticket_id} verified in database: {log_count} lifecycle log entries "
+                f"and {action_count} logged actions. Latest activity at {time_str}{actor_suffix}."
+            )
+        else:
+            summary = (
+                f"No database activity records found for ticket #{ticket_id} "
+                "in ticket_log or ticket_log_action."
+            )
+
+        return TicketDiagnosticRecordDomainDTO(
+            ticket_id=ticket_id,
+            has_db_activity=has_activity,
+            recent_error_count=0,
+            last_activity_time=latest_time,
+            diagnostic_summary=summary,
         )

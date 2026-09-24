@@ -7,6 +7,9 @@ from mcp.server.transport_security import TransportSecuritySettings
 from starlette.applications import Starlette
 
 from so_mcp.adapters.factory import create_superoffice_client
+from so_mcp.audit.contracts import TicketAuditCriteriaDTO
+from so_mcp.audit.factory import create_ticket_audit_service
+from so_mcp.audit.service import TicketAuditService
 from so_mcp.contracts.dtos import (
     CompanySearchCriteriaDTO,
     PersonSearchCriteriaDTO,
@@ -14,6 +17,9 @@ from so_mcp.contracts.dtos import (
 )
 from so_mcp.contracts.errors import SuperOfficeIntegrationError
 from so_mcp.contracts.interfaces import SuperOfficeClient
+from so_mcp.extra_tables.contracts import ExtraTableQueryCriteriaDTO
+from so_mcp.extra_tables.factory import create_extra_table_service
+from so_mcp.extra_tables.service import ExtraTableService
 from so_mcp.services.ticket_service import SuperOfficeApplicationService
 from so_mcp.settings import SuperOfficeServerSettings
 from so_mcp.sync.service import SuperOfficeCodebaseSyncService
@@ -34,14 +40,16 @@ ALLOWED_BACKEND_HOSTS = [
 ]
 
 
-def create_superoffice_mcp_server(
+def create_superoffice_mcp_server(  # noqa: PLR0915
     service: SuperOfficeApplicationService | None = None,
     client: SuperOfficeClient | None = None,
     sync_service: SuperOfficeCodebaseSyncService | None = None,
+    extra_table_service: ExtraTableService | None = None,
+    audit_service: TicketAuditService | None = None,
 ) -> FastMCP:
     """Instantiate and configure the official FastMCP SuperOffice server.
 
-    Registers approved SuperOffice operations and codebase sync tools.
+    Registers approved SuperOffice operations, extra tables tools, and codebase sync tools.
     """
     mcp_server = FastMCP(
         name="superoffice-mcp-server",
@@ -193,20 +201,109 @@ def create_superoffice_mcp_server(
         nonlocal active_sync_service
         if active_sync_service is None:
             active_sync_service = SuperOfficeCodebaseSyncService()
-        selected_tables = (
-            [t.strip() for t in tables.split(",") if t.strip()] if tables else None
-        )
+        selected_tables = [t.strip() for t in tables.split(",") if t.strip()] if tables else None
         res = await active_sync_service.sync(mode=mode, tables=selected_tables, dry_run=dry_run)
+        return res.model_dump(mode="json")
+
+    active_extra_table_service = extra_table_service
+
+    @mcp_server.tool(
+        name="list_extra_tables",
+        description=(
+            "List registered SuperOffice custom extra tables (y_*) with metadata and field counts"
+        ),
+    )
+    async def list_extra_tables(search: str | None = None) -> dict[str, Any]:
+        nonlocal active_extra_table_service
+        if active_extra_table_service is None:
+            active_extra_table_service = create_extra_table_service()
+        tables = await active_extra_table_service.list_extra_tables(search=search)
+        return {
+            "tables": [t.model_dump(mode="json") for t in tables],
+            "total_count": len(tables),
+        }
+
+    @mcp_server.tool(
+        name="get_extra_table_schema",
+        description=(
+            "Retrieve column definitions, labels, data types, and defaults for a specific y_* table"
+        ),
+    )
+    async def get_extra_table_schema(table_name: str) -> dict[str, Any]:
+        nonlocal active_extra_table_service
+        if active_extra_table_service is None:
+            active_extra_table_service = create_extra_table_service()
+        schema = await active_extra_table_service.get_extra_table_schema(table_name=table_name)
+        return schema.model_dump(mode="json")
+
+    @mcp_server.tool(
+        name="query_extra_table",
+        description=(
+            "Query records from a specific SuperOffice custom extra table with "
+            "column-level filtering, projection, ordering, and pagination"
+        ),
+    )
+    async def query_extra_table(  # noqa: PLR0917
+        table_name: str,
+        fields: list[str] | None = None,
+        filters: dict[str, Any] | None = None,
+        order_by: str | None = "id",
+        order_direction: str = "asc",
+        limit: int = 20,
+        offset: int = 0,
+    ) -> dict[str, Any]:
+        nonlocal active_extra_table_service
+        if active_extra_table_service is None:
+            active_extra_table_service = create_extra_table_service()
+        direction = "desc" if order_direction and order_direction.lower() == "desc" else "asc"
+        criteria = ExtraTableQueryCriteriaDTO(
+            table_name=table_name,
+            fields=tuple(fields) if fields else None,
+            filters=filters,
+            order_by=order_by,
+            order_direction=direction,
+            limit=limit,
+            offset=offset,
+        )
+        res = await active_extra_table_service.query_extra_table(criteria)
+        return res.model_dump(mode="json")
+
+    active_audit_service = audit_service
+
+    @mcp_server.tool(
+        name="get_ticket_audit_trail",
+        description=(
+            "Retrieve the complete, chronological audit trail and change history for a "
+            "SuperOffice ticket, including high-level lifecycle events, user actions, and "
+            "granular before/after field mutations."
+        ),
+    )
+    async def get_ticket_audit_trail(
+        ticket_id: int,
+        include_field_changes: bool = True,
+        limit: int = 50,
+    ) -> dict[str, Any]:
+        nonlocal active_audit_service
+        if active_audit_service is None:
+            active_audit_service = create_ticket_audit_service()
+        criteria = TicketAuditCriteriaDTO(
+            ticket_id=ticket_id,
+            include_field_changes=include_field_changes,
+            limit=limit,
+        )
+        res = await active_audit_service.get_ticket_audit_trail(criteria)
         return res.model_dump(mode="json")
 
     return mcp_server
 
 
-def create_app(
+def create_app(  # noqa: PLR0917
     settings: SuperOfficeServerSettings | None = None,
     service: SuperOfficeApplicationService | None = None,
     client: SuperOfficeClient | None = None,
     sync_service: SuperOfficeCodebaseSyncService | None = None,
+    extra_table_service: ExtraTableService | None = None,
+    audit_service: TicketAuditService | None = None,
 ) -> Starlette:
     """Create the Starlette ASGI application for SuperOffice MCP Server."""
     active_service = service
@@ -218,6 +315,10 @@ def create_app(
             active_client = create_superoffice_client(active_settings)
             active_service = SuperOfficeApplicationService(client=active_client)
 
-    server = create_superoffice_mcp_server(service=active_service, sync_service=sync_service)
+    server = create_superoffice_mcp_server(
+        service=active_service,
+        sync_service=sync_service,
+        extra_table_service=extra_table_service,
+        audit_service=audit_service,
+    )
     return server.streamable_http_app()
-

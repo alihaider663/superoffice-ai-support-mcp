@@ -70,6 +70,26 @@ tools:
     classification: READ_ONLY
     data_level: INTERNAL
     description: "Synchronize SuperOffice CRMScripts, screens, and custom tables to local mirror directory"
+  list_extra_tables:
+    minimum_role: L2
+    classification: READ_ONLY
+    data_level: INTERNAL
+    description: "List registered SuperOffice custom extra tables (y_*) with metadata and field counts"
+  get_extra_table_schema:
+    minimum_role: L2
+    classification: READ_ONLY
+    data_level: INTERNAL
+    description: "Retrieve column definitions, labels, data types, and defaults for a specific y_* table"
+  query_extra_table:
+    minimum_role: L2
+    classification: READ_ONLY
+    data_level: CONFIDENTIAL
+    description: "Query records from a specific SuperOffice custom extra table with column-level filtering, projection, ordering, and pagination"
+  get_ticket_audit_trail:
+    minimum_role: L2
+    classification: READ_ONLY
+    data_level: CONFIDENTIAL
+    description: "Retrieve chronological audit trail and change history for a SuperOffice ticket"
   update_ticket_status:
     minimum_role: L2
     classification: SENSITIVE_WRITE

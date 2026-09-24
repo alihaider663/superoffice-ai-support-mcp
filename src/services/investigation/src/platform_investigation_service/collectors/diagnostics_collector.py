@@ -231,9 +231,7 @@ class DiagnosticsEvidenceCollector:
         if slow_query_res is not None:
             for idx, sq in enumerate(slow_query_res.items):
                 sq_ts = (
-                    sq.last_execution_time
-                    if isinstance(sq.last_execution_time, datetime)
-                    else now
+                    sq.last_execution_time if isinstance(sq.last_execution_time, datetime) else now
                 )
                 items.append(
                     DiagnosticEvidence(

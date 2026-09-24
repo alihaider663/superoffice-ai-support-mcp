@@ -98,20 +98,27 @@ def create_diagnostics_mcp_server(
     @mcp_server.tool(
         name="get_ticket_diagnostic_record",
         description=(
-            "Get diagnostic database records for a ticket (BLOCKED: awaiting schema "
-            "verification. Do not call or retry calling this tool)."
+            "Inspect database-level diagnostic activity and update telemetry for a ticket, "
+            "verifying database recording state, activity counts, and recent mutations."
         ),
     )
     async def get_ticket_diagnostic_record(ticket_id: int) -> dict[str, Any]:
-        if app_service is not None:
-            criteria = TicketDiagnosticCriteriaDTO(ticket_id=ticket_id)
-            res = await app_service.get_ticket_diagnostic_record(criteria)
-            if res is not None:
-                return res.model_dump(mode="json")
-        raise DatabaseDiagnosticError(
-            "Ticket diagnostic record querying is blocked pending DB schema verification.",
-            error_code="DIAGNOSTIC_SCHEMA_NOT_CONFIGURED",
-        )
+        if app_service is None:
+            raise DatabaseDiagnosticError(
+                "Diagnostics database service is not configured or unavailable.",
+                error_code="DIAGNOSTICS_SERVICE_UNCONFIGURED",
+            )
+        criteria = TicketDiagnosticCriteriaDTO(ticket_id=ticket_id)
+        res = await app_service.get_ticket_diagnostic_record(criteria)
+        if res is not None:
+            return res.model_dump(mode="json")
+        return {
+            "ticket_id": ticket_id,
+            "has_db_activity": False,
+            "recent_error_count": 0,
+            "last_activity_time": None,
+            "diagnostic_summary": f"No database diagnostic records found for ticket #{ticket_id}.",
+        }
 
     @mcp_server.tool(
         name="search_logs",

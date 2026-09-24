@@ -283,4 +283,3 @@ class HttpToolDispatcher(StreamableHttpDispatcher):
         """Close persistent HTTP transport pool."""
         if self._transport is not None:
             await self._transport.aclose()
-

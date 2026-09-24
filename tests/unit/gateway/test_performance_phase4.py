@@ -182,8 +182,6 @@ async def test_diagnostics_collector_runs_queries_concurrently() -> None:
     assert elapsed < (delay * 2.4)
 
 
-
-
 @pytest.mark.asyncio
 async def test_http_dispatcher_connection_pool_and_lifecycle() -> None:
     """HttpToolDispatcher maintains persistent transport pool and cleans up on aclose."""
@@ -239,5 +237,3 @@ async def test_gateway_app_lifespan_calls_aclose() -> None:
         pass
 
     mock_service.aclose.assert_awaited_once()
-
-

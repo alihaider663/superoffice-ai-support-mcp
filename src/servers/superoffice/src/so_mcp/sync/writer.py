@@ -137,9 +137,7 @@ class SuperOfficeCodebaseWriter:
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes(c_bytes)
             except OSError as exc:
-                raise CodebaseWriterError(
-                    f"Failed to write screen script {target}: {exc}"
-                ) from exc
+                raise CodebaseWriterError(f"Failed to write screen script {target}: {exc}") from exc
 
         r_path = target.relative_to(self._output_dir).as_posix()
         return SyncManifestEntryDTO(
@@ -295,9 +293,7 @@ class SuperOfficeCodebaseWriter:
             all_actions.extend(s.actions)
             all_elements.extend(s.elements)
             entries.extend(
-                self._write_screen_dir(
-                    screens_root, s, seen_screen_folders, dry_run=dry_run
-                )
+                self._write_screen_dir(screens_root, s, seen_screen_folders, dry_run=dry_run)
             )
 
         root_tables = [
@@ -309,9 +305,7 @@ class SuperOfficeCodebaseWriter:
             if not table_records:
                 continue
             target_file = build_safe_target_path(screens_root, [], fname)
-            content_bytes = json.dumps(
-                table_records, indent=2, ensure_ascii=False
-            ).encode("utf-8")
+            content_bytes = json.dumps(table_records, indent=2, ensure_ascii=False).encode("utf-8")
             sha256_hash = hashlib.sha256(content_bytes).hexdigest()
 
             if not dry_run:

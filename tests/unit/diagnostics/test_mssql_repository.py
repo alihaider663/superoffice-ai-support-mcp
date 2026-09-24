@@ -303,16 +303,40 @@ async def test_find_blocking_sessions_success() -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_ticket_diagnostic_record_fails_closed_unconfigured() -> None:
-    """get_ticket_diagnostic_record raises DIAGNOSTIC_SCHEMA_NOT_CONFIGURED."""
-    engine = _create_mock_engine()
+async def test_get_ticket_diagnostic_record_success_with_activity() -> None:
+    """get_ticket_diagnostic_record parses activity counts, timestamps, and actor correctly."""
+    now = datetime(2026, 5, 24, 14, 8, 31, tzinfo=UTC)
+    stats_row = (2, 5, datetime(2026, 5, 24, 10, 29, 44), datetime(2026, 5, 24, 14, 8, 31))
+    actor_row = (datetime(2026, 5, 24, 14, 8, 31), "junaid.tariq")
+
+    engine = _create_multi_query_engine([stats_row, actor_row])
     repo = MssqlDiagnosticRepository(engine)
 
-    with pytest.raises(DatabaseDiagnosticError) as exc_info:
-        await repo.get_ticket_diagnostic_record(TicketDiagnosticCriteriaDTO(ticket_id=5005))
+    rec = await repo.get_ticket_diagnostic_record(TicketDiagnosticCriteriaDTO(ticket_id=5005))
+    assert rec is not None
+    assert rec.ticket_id == 5005
+    assert rec.has_db_activity is True
+    assert rec.last_activity_time == now
+    assert "junaid.tariq" in rec.diagnostic_summary
+    assert "2 lifecycle log entries" in rec.diagnostic_summary
+    assert "5 logged actions" in rec.diagnostic_summary
 
-    assert exc_info.value.error_code == "DIAGNOSTIC_SCHEMA_NOT_CONFIGURED"
-    assert exc_info.value.details["ticket_id"] == 5005
+
+@pytest.mark.asyncio
+async def test_get_ticket_diagnostic_record_no_activity() -> None:
+    """get_ticket_diagnostic_record returns has_db_activity=False when no rows exist."""
+    stats_row = (0, 0, None, None)
+    actor_row = None
+
+    engine = _create_multi_query_engine([stats_row, actor_row])
+    repo = MssqlDiagnosticRepository(engine)
+
+    rec = await repo.get_ticket_diagnostic_record(TicketDiagnosticCriteriaDTO(ticket_id=9999))
+    assert rec is not None
+    assert rec.ticket_id == 9999
+    assert rec.has_db_activity is False
+    assert rec.last_activity_time is None
+    assert "No database activity records found" in rec.diagnostic_summary
 
 
 @pytest.mark.asyncio
