@@ -25,6 +25,16 @@ from so_mcp.extra_tables.contracts import (
     ExtraTableQueryResultDTO,
     ExtraTableSummaryDTO,
 )
+from so_mcp.metadata.contracts import (
+    AssociateDetailDTO,
+    ScheduledTaskItemDTO,
+    SystemEventsResultDTO,
+    TicketCategoryItemDTO,
+    TicketMetadataListsDTO,
+    TicketPriorityItemDTO,
+    TicketStatusItemDTO,
+    UserGroupItemDTO,
+)
 from so_mcp.server import create_app, create_superoffice_mcp_server
 from so_mcp.sync.contracts import SyncManifestDTO, SyncResultDTO
 from tests.fakes.fake_superoffice_client import FakeSuperOfficeClient
@@ -51,6 +61,9 @@ def test_so_server_registers_all_approved_tools() -> None:
         "search_codebase",
         "get_codebase_file",
         "get_screen_details",
+        "get_associate_details",
+        "get_ticket_metadata_lists",
+        "list_system_events_and_triggers",
     }
     assert tool_names == expected_tools
 
@@ -353,3 +366,104 @@ async def test_so_server_codebase_tools_invocation() -> None:
     screen_res = await tools["get_screen_details"].fn(screen_name_or_id="Create case")
     assert screen_res["found"] is True
     assert screen_res["screen_name"] == "Create case"
+
+
+@pytest.mark.asyncio
+async def test_so_server_metadata_tools_invocation() -> None:
+    """SuperOffice FastMCP server invokes metadata, list, and scheduled task tools."""
+    mock_metadata = AsyncMock()
+    mock_metadata.get_associate_details.return_value = AssociateDetailDTO(
+        associate_id=1607,
+        ejuser_id=1606,
+        name="Junaid Tariq",
+        username="junaid.tariq",
+        first_name="Junaid",
+        last_name="Tariq",
+        title="Consultant",
+        email="[REDACTED_EMAIL]",
+        group_id=4,
+        group_name="Services",
+        is_active=True,
+        default_category_id=15,
+    )
+    mock_metadata.get_ticket_metadata_lists.return_value = TicketMetadataListsDTO(
+        categories=(
+            TicketCategoryItemDTO(
+                category_id=15,
+                name="Support",
+                fullname="Support",
+                parent_id=0,
+                delegate_method=1,
+                notification_email=None,
+                closing_status=2,
+            ),
+        ),
+        priorities=(
+            TicketPriorityItemDTO(
+                priority_id=1,
+                name="Normal",
+                status=1,
+                sort_order=10,
+                flags=0,
+            ),
+        ),
+        statuses=(
+            TicketStatusItemDTO(
+                status_id=1,
+                name="Open",
+                status_type=1,
+                ts_rank=1,
+                time_counter=1,
+                is_deleted=False,
+            ),
+        ),
+        user_groups=(UserGroupItemDTO(group_id=4, name="Services", rank=1),),
+        total_categories=1,
+        total_priorities=1,
+        total_statuses=1,
+        total_user_groups=1,
+    )
+    mock_metadata.list_system_events_and_triggers.return_value = SystemEventsResultDTO(
+        total_tasks=1,
+        returned_tasks=1,
+        tasks=(
+            ScheduledTaskItemDTO(
+                task_id=43,
+                schedule_id=43,
+                task_name="Calculate Dashboard",
+                script_id=148,
+                script_identifier="abc",
+                script_include_id="calculateDashboard",
+                is_disabled=True,
+                execution_status=2,
+                minute_interval=10,
+                last_execution="2025-01-03T15:40:35",
+                next_execution="2025-09-02T15:23:00",
+                execution_time_ms=2,
+                error_message="EjScript runtime exception: No ExtraTable named: y_dashboard",
+                last_error="2025-09-02T15:11:07",
+                retries=1,
+            ),
+        ),
+    )
+
+    server = create_superoffice_mcp_server(metadata_service=mock_metadata)
+    tools = server._tool_manager._tools
+
+    # 1. get_associate_details
+    assoc_res = await tools["get_associate_details"].fn(username="junaid.tariq")
+    assert assoc_res["associate_id"] == 1607
+    assert assoc_res["username"] == "junaid.tariq"
+    mock_metadata.get_associate_details.assert_called_once()
+
+    # 2. get_ticket_metadata_lists
+    lists_res = await tools["get_ticket_metadata_lists"].fn(list_type="all")
+    assert lists_res["total_categories"] == 1
+    assert lists_res["categories"][0]["name"] == "Support"
+    mock_metadata.get_ticket_metadata_lists.assert_called_once()
+
+    # 3. list_system_events_and_triggers
+    events_res = await tools["list_system_events_and_triggers"].fn(only_errors=True)
+    assert events_res["returned_tasks"] == 1
+    assert events_res["tasks"][0]["task_name"] == "Calculate Dashboard"
+    mock_metadata.list_system_events_and_triggers.assert_called_once()

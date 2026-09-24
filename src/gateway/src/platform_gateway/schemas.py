@@ -900,6 +900,77 @@ def get_platform_tool_schemas() -> list[Tool]:
                 "required": ["screen_name_or_id"],
             },
         ),
+        Tool(
+            name="get_associate_details",
+            description=(
+                "Retrieve details for an internal SuperOffice consultant, support engineer, "
+                "or technician by associate ID or username."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "associate_id": {
+                        "type": "integer",
+                        "description": "SuperOffice associate ID or ejuser ID",
+                    },
+                    "username": {
+                        "type": "string",
+                        "description": "Username or login name to search for",
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="get_ticket_metadata_lists",
+            description=(
+                "Retrieve system reference lists including ticket categories, priorities, "
+                "statuses, and user groups."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "list_type": {
+                        "type": "string",
+                        "enum": ["all", "category", "priority", "status", "group", "user_group"],
+                        "description": "Type of list to retrieve (default: all)",
+                        "default": "all",
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="list_system_events_and_triggers",
+            description=(
+                "Inspect scheduled background tasks, cron execution statuses, and CRMScript "
+                "bindings across the SuperOffice system."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "include_disabled": {
+                        "type": "boolean",
+                        "description": "Include disabled scheduled tasks (default: true)",
+                        "default": True,
+                    },
+                    "only_errors": {
+                        "type": "boolean",
+                        "description": "Filter only to tasks with errors or error messages",
+                        "default": False,
+                    },
+                    "query": {
+                        "type": "string",
+                        "description": "Optional search keyword to match task or script names",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 100,
+                        "description": "Maximum number of tasks to return (default: 50)",
+                        "default": 50,
+                    },
+                },
+            },
+        ),
         # Diagnostics MCP Tools (L2 & L3)
         Tool(
             name="get_database_health",

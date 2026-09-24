@@ -26,6 +26,13 @@ from so_mcp.contracts.interfaces import SuperOfficeClient
 from so_mcp.extra_tables.contracts import ExtraTableQueryCriteriaDTO
 from so_mcp.extra_tables.factory import create_extra_table_service
 from so_mcp.extra_tables.service import ExtraTableService
+from so_mcp.metadata.contracts import (
+    AssociateDetailCriteriaDTO,
+    SystemEventsCriteriaDTO,
+    TicketMetadataListsCriteriaDTO,
+)
+from so_mcp.metadata.factory import create_metadata_service
+from so_mcp.metadata.service import SuperOfficeMetadataService
 from so_mcp.services.ticket_service import SuperOfficeApplicationService
 from so_mcp.settings import SuperOfficeServerSettings
 from so_mcp.sync.service import SuperOfficeCodebaseSyncService
@@ -53,6 +60,7 @@ def create_superoffice_mcp_server(  # noqa: PLR0915, PLR0917
     extra_table_service: ExtraTableService | None = None,
     audit_service: TicketAuditService | None = None,
     codebase_service: CodebaseIntelligenceService | None = None,
+    metadata_service: SuperOfficeMetadataService | None = None,
 ) -> FastMCP:
     """Instantiate and configure the official FastMCP SuperOffice server.
 
@@ -372,6 +380,75 @@ def create_superoffice_mcp_server(  # noqa: PLR0915, PLR0917
         data["found"] = True
         return data
 
+    active_metadata_service = metadata_service
+
+    @mcp_server.tool(
+        name="get_associate_details",
+        description=(
+            "Retrieve details for an internal SuperOffice consultant, support engineer, "
+            "or technician by associate ID or username."
+        ),
+    )
+    async def get_associate_details(
+        associate_id: int | None = None,
+        username: str | None = None,
+    ) -> dict[str, Any]:
+        nonlocal active_metadata_service
+        if active_metadata_service is None:
+            active_metadata_service = create_metadata_service()
+        criteria = AssociateDetailCriteriaDTO(associate_id=associate_id, username=username)
+        res = await active_metadata_service.get_associate_details(criteria)
+        if res is None:
+            return {
+                "found": False,
+                "error": f"Associate not found for id={associate_id}, username={username}",
+            }
+        data = res.model_dump(mode="json")
+        data["found"] = True
+        return data
+
+    @mcp_server.tool(
+        name="get_ticket_metadata_lists",
+        description=(
+            "Retrieve system reference lists including ticket categories, priorities, "
+            "statuses, and user groups."
+        ),
+    )
+    async def get_ticket_metadata_lists(
+        list_type: str = "all",
+    ) -> dict[str, Any]:
+        nonlocal active_metadata_service
+        if active_metadata_service is None:
+            active_metadata_service = create_metadata_service()
+        criteria = TicketMetadataListsCriteriaDTO(list_type=list_type)  # type: ignore[arg-type]
+        res = await active_metadata_service.get_ticket_metadata_lists(criteria)
+        return res.model_dump(mode="json")
+
+    @mcp_server.tool(
+        name="list_system_events_and_triggers",
+        description=(
+            "Inspect scheduled background tasks, cron execution statuses, and CRMScript "
+            "bindings across the SuperOffice system."
+        ),
+    )
+    async def list_system_events_and_triggers(
+        include_disabled: bool = True,
+        only_errors: bool = False,
+        query: str | None = None,
+        limit: int = 50,
+    ) -> dict[str, Any]:
+        nonlocal active_metadata_service
+        if active_metadata_service is None:
+            active_metadata_service = create_metadata_service()
+        criteria = SystemEventsCriteriaDTO(
+            include_disabled=include_disabled,
+            only_errors=only_errors,
+            query=query,
+            limit=limit,
+        )
+        res = await active_metadata_service.list_system_events_and_triggers(criteria)
+        return res.model_dump(mode="json")
+
     return mcp_server
 
 
@@ -383,6 +460,7 @@ def create_app(  # noqa: PLR0917
     extra_table_service: ExtraTableService | None = None,
     audit_service: TicketAuditService | None = None,
     codebase_service: CodebaseIntelligenceService | None = None,
+    metadata_service: SuperOfficeMetadataService | None = None,
 ) -> Starlette:
     """Create the Starlette ASGI application for SuperOffice MCP Server."""
     active_service = service
@@ -400,5 +478,6 @@ def create_app(  # noqa: PLR0917
         extra_table_service=extra_table_service,
         audit_service=audit_service,
         codebase_service=codebase_service,
+        metadata_service=metadata_service,
     )
     return server.streamable_http_app()

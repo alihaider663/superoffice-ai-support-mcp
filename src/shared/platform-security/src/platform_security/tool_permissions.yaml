@@ -105,6 +105,21 @@ tools:
     classification: READ_ONLY
     data_level: INTERNAL
     description: "Inspect the structural layout, elements, button actions, and lifecycle scripts of a SuperOffice screen"
+  get_associate_details:
+    minimum_role: L1
+    classification: READ_ONLY
+    data_level: INTERNAL
+    description: "Retrieve details for an internal SuperOffice consultant, support engineer, or technician"
+  get_ticket_metadata_lists:
+    minimum_role: L1
+    classification: READ_ONLY
+    data_level: INTERNAL
+    description: "Retrieve system reference lists including ticket categories, priorities, statuses, and user groups"
+  list_system_events_and_triggers:
+    minimum_role: L2
+    classification: READ_ONLY
+    data_level: CONFIDENTIAL
+    description: "Inspect scheduled background tasks, cron execution statuses, and CRMScript bindings"
   update_ticket_status:
     minimum_role: L2
     classification: SENSITIVE_WRITE

@@ -49,9 +49,9 @@ def sample_security_context() -> SecurityContext:
 
 
 def test_schema_map_resolution() -> None:
-    """get_tool_schema_map returns dict covering all 26 approved tools."""
+    """get_tool_schema_map returns dict covering all 29 approved tools."""
     schema_map = get_tool_schema_map()
-    assert len(schema_map) == 26
+    assert len(schema_map) == 29
     assert "investigate_incident" in schema_map
     assert "get_ticket" in schema_map
     assert "sync_codebase" in schema_map
@@ -60,6 +60,9 @@ def test_schema_map_resolution() -> None:
     assert "search_codebase" in schema_map
     assert "get_codebase_file" in schema_map
     assert "get_screen_details" in schema_map
+    assert "get_associate_details" in schema_map
+    assert "get_ticket_metadata_lists" in schema_map
+    assert "list_system_events_and_triggers" in schema_map
 
 
 def test_validate_3way_tool_inventory_unrouted_backend() -> None:

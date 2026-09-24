@@ -81,9 +81,9 @@ Each backend is exclusively owned by a single service boundary. External AI mode
 
 ---
 
-## Canonical Public Tool Inventory (26 Tools)
+## Canonical Public Tool Inventory (29 Tools)
 
-The Gateway exposes exactly **26 registered public tools** over Streamable HTTP ([ADR 007](docs/adr/007-gateway-protocol-selection.md)). There are zero aliases and zero public ingestion tools.
+The Gateway exposes exactly **29 registered public tools** over Streamable HTTP ([ADR 007](docs/adr/007-gateway-protocol-selection.md)). There are zero aliases and zero public ingestion tools.
 
 | Server | Tool Name | Minimum Role | Classification | Data Level | Description |
 | :--- | :--- | :---: | :---: | :---: | :--- |
@@ -103,6 +103,9 @@ The Gateway exposes exactly **26 registered public tools** over Streamable HTTP 
 | | `search_codebase` | L1 | `READ_ONLY` | `INTERNAL` | Search mirrored CRMScripts, screens, actions, and elements |
 | | `get_codebase_file` | L2 | `READ_ONLY` | `CONFIDENTIAL` | Read mirrored script or definition file with 200-line windowing |
 | | `get_screen_details` | L1 | `READ_ONLY` | `INTERNAL` | Inspect screen lifecycle scripts, buttons, and elements |
+| | `get_associate_details` | L1 | `READ_ONLY` | `INTERNAL` | Resolve internal consultant and technician profile |
+| | `get_ticket_metadata_lists` | L1 | `READ_ONLY` | `INTERNAL` | Reference lists for categories, priorities, statuses, groups |
+| | `list_system_events_and_triggers` | L2 | `READ_ONLY` | `CONFIDENTIAL` | Inspect scheduled background tasks and failure status |
 | **Diagnostics MCP** | `get_database_health` | L2 | `READ_ONLY` | `CONFIDENTIAL` | Database health, DMV checks, uptime metrics |
 | | `find_slow_queries` | L2 | `READ_ONLY` | `CONFIDENTIAL` | Identify top slow queries (max 50 rows, 5s timeout) |
 | | `find_deadlocks` | L2 | `READ_ONLY` | `CONFIDENTIAL` | Parse deadlock graphs from system_health ring buffer |
@@ -118,6 +121,7 @@ The Gateway exposes exactly **26 registered public tools** over Streamable HTTP 
 - `search_logs`: `IMPLEMENTED / CONFIGURATION-CONDITIONAL` (operational when local log directories are configured).
 - `get_ticket_diagnostic_record`: `ACTIVE / OPERATIONAL` (queries `ticket_log` and `ticket_log_action` with sanitized summaries).
 - `get_ticket_audit_trail`: `ACTIVE / OPERATIONAL` (queries `ticket_log`, `ticket_log_action`, `ticket_log_change`, and `ejuser`).
+- `get_associate_details`, `get_ticket_metadata_lists`, `list_system_events_and_triggers`: `ACTIVE / OPERATIONAL` (queries `ASSOCIATE`, `EJUSER`, `EJ_CATEGORY`, `SCHEDULE`, `SCHEDULED_TASK`).
 - `list_extra_tables`, `get_extra_table_schema`, `query_extra_table`: `ACTIVE / OPERATIONAL` (user-defined `y_*` discovery).
 - `Knowledge tools`: `CONFIGURED / LOCAL OPERATIONAL` (backed by local PostgreSQL + pgvector and FastEmbed).
 - `investigate_incident`: Operational with 4 frozen subordinate operations (`get_ticket`, `get_database_health`, `find_slow_queries`, `find_deadlocks`). Subordinate `application_logs` returns `BLOCKED` and `knowledge_base` returns `NOT_CONFIGURED`.

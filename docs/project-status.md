@@ -134,19 +134,19 @@ To guarantee security and data minimization, each backend data source is exclusi
 
 ---
 
-## 5. Canonical Public Tool Inventory (Total 26)
+## 5. Canonical Public Tool Inventory (Total 29)
 
-The platform exposes exactly **26 canonical public tools** registered at the Gateway perimeter. There are zero aliases and zero public ingestion tools.
+The platform exposes exactly **29 canonical public tools** registered at the Gateway perimeter. There are zero aliases and zero public ingestion tools.
 
 ```text
-SuperOffice MCP (16)   Diagnostics MCP (6)    Knowledge MCP (3)    Investigation MCP (1)
-────────────────────   ───────────────────    ─────────────────    ─────────────────────
-get_ticket             get_database_health    search_knowledge     investigate_incident
-search_tickets         find_slow_queries      get_runbook
-get_ticket_messages    find_deadlocks         find_known_issues
-list_attachments       find_blocking_sessions
-get_company            search_logs
-find_companies         get_ticket_diagnostic_record
+SuperOffice MCP (19)             Diagnostics MCP (6)    Knowledge MCP (3)    Investigation MCP (1)
+──────────────────────────────   ───────────────────    ─────────────────    ─────────────────────
+get_ticket                       get_database_health    search_knowledge     investigate_incident
+search_tickets                   find_slow_queries      get_runbook
+get_ticket_messages              find_deadlocks         find_known_issues
+list_attachments                 find_blocking_sessions
+get_company                      search_logs
+find_companies                   get_ticket_diagnostic_record
 get_person
 find_persons
 sync_codebase
@@ -157,6 +157,9 @@ get_ticket_audit_trail
 search_codebase
 get_codebase_file
 get_screen_details
+get_associate_details
+get_ticket_metadata_lists
+list_system_events_and_triggers
 ```
 
 - **Infrastructure MCP**: 0 public tools (structural slot retained; implementation deferred under Decision `D07`).
@@ -198,6 +201,9 @@ The platform strictly distinguishes between **registered public contract invento
 | `search_codebase` | SuperOffice | L1 / READ_ONLY / INTERNAL | **OPERATIONAL** | Fast query across mirrored scripts, screens, elements. |
 | `get_codebase_file` | SuperOffice | L2 / READ_ONLY / CONFIDENTIAL | **OPERATIONAL** | Reads mirrored code with 200-line windowing & PII scrub. |
 | `get_screen_details` | SuperOffice | L1 / READ_ONLY / INTERNAL | **OPERATIONAL** | Inspects screen lifecycle scripts, buttons, elements. |
+| `get_associate_details` | SuperOffice | L1 / READ_ONLY / INTERNAL | **OPERATIONAL** | Resolves internal consultants, technicians, and groups (`ASSOCIATE`, `EJUSER`, `PERSON`, `USERGROUP`). |
+| `get_ticket_metadata_lists` | SuperOffice | L1 / READ_ONLY / INTERNAL | **OPERATIONAL** | Reference lists for ticket categories, priorities, statuses, and groups (`EJ_CATEGORY`, `TICKET_PRIORITY`, etc.). |
+| `list_system_events_and_triggers` | SuperOffice | L2 / READ_ONLY / CONFIDENTIAL | **OPERATIONAL** | Scheduled task execution health, intervals, and error triage (`SCHEDULE`, `SCHEDULED_TASK`). |
 | `get_database_health` | Diagnostics | L2 / READ_ONLY / CONFIDENTIAL | **OPERATIONAL** | Live/Mock MSSQL DMV checks (5s timeout, SNAPSHOT). |
 | `find_slow_queries` | Diagnostics | L2 / READ_ONLY / CONFIDENTIAL | **OPERATIONAL** | Live/Mock DMV query analysis (capped at 50 rows). |
 | `find_deadlocks` | Diagnostics | L2 / READ_ONLY / CONFIDENTIAL | **OPERATIONAL** | Live/Mock system_health ring buffer parser. |
