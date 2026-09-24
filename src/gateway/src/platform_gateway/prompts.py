@@ -44,6 +44,7 @@ def _build_investigate_support_ticket_prompt(
         "   - Do NOT repeatedly invoke tools that return empty results, zero matches, or errors.",
         "   - `search_logs` is UNCONFIGURED/BLOCKED in this environment. Do NOT call or retry it.",
         "   - `get_ticket_diagnostic_record` inspects ticket DB telemetry and audit history.",
+        "   - `search_codebase` and `get_codebase_file` inspect custom scripts and screens.",
         "   - If a tool search returns no items, accept the result and proceed with available",
         "     evidence. Do not retry identical queries with minor keyword tweaks.",
         "",

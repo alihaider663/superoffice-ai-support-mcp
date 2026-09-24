@@ -3,7 +3,7 @@
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
 [![MCP Official SDK](https://img.shields.io/badge/MCP-Official%20SDK-orange.svg)](https://modelcontextprotocol.io/)
 [![Status](https://img.shields.io/badge/Status-Local%20Development%20Release%201.0-brightgreen.svg)]()
-[![Regression Tests](https://img.shields.io/badge/Tests-1142%20Passed-success.svg)]()
+[![Regression Tests](https://img.shields.io/badge/Tests-1153%20Passed-success.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 An enterprise-grade, secure, modular Model Context Protocol (MCP) platform for AI-assisted SuperOffice CRM support triage, diagnostic telemetry, and cross-system incident investigation.
@@ -81,9 +81,9 @@ Each backend is exclusively owned by a single service boundary. External AI mode
 
 ---
 
-## Canonical Public Tool Inventory (23 Tools)
+## Canonical Public Tool Inventory (26 Tools)
 
-The Gateway exposes exactly **23 registered public tools** over Streamable HTTP ([ADR 007](docs/adr/007-gateway-protocol-selection.md)). There are zero aliases and zero public ingestion tools.
+The Gateway exposes exactly **26 registered public tools** over Streamable HTTP ([ADR 007](docs/adr/007-gateway-protocol-selection.md)). There are zero aliases and zero public ingestion tools.
 
 | Server | Tool Name | Minimum Role | Classification | Data Level | Description |
 | :--- | :--- | :---: | :---: | :---: | :--- |
@@ -100,6 +100,9 @@ The Gateway exposes exactly **23 registered public tools** over Streamable HTTP 
 | | `get_extra_table_schema` | L2 | `READ_ONLY` | `INTERNAL` | Retrieve column schema and types for extra tables |
 | | `query_extra_table` | L2 | `READ_ONLY` | `CONFIDENTIAL` | Bounded, parameterized read queries on extra tables |
 | | `get_ticket_audit_trail` | L2 | `READ_ONLY` | `CONFIDENTIAL` | Chronological ticket audit trail, actions, and field changes |
+| | `search_codebase` | L1 | `READ_ONLY` | `INTERNAL` | Search mirrored CRMScripts, screens, actions, and elements |
+| | `get_codebase_file` | L2 | `READ_ONLY` | `CONFIDENTIAL` | Read mirrored script or definition file with 200-line windowing |
+| | `get_screen_details` | L1 | `READ_ONLY` | `INTERNAL` | Inspect screen lifecycle scripts, buttons, and elements |
 | **Diagnostics MCP** | `get_database_health` | L2 | `READ_ONLY` | `CONFIDENTIAL` | Database health, DMV checks, uptime metrics |
 | | `find_slow_queries` | L2 | `READ_ONLY` | `CONFIDENTIAL` | Identify top slow queries (max 50 rows, 5s timeout) |
 | | `find_deadlocks` | L2 | `READ_ONLY` | `CONFIDENTIAL` | Parse deadlock graphs from system_health ring buffer |

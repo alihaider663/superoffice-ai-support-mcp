@@ -820,6 +820,86 @@ def get_platform_tool_schemas() -> list[Tool]:
                 "required": ["ticket_id"],
             },
         ),
+        Tool(
+            name="search_codebase",
+            description=(
+                "Search across all mirrored SuperOffice CRMScripts, screen definitions, button "
+                "actions, and element creation scripts by keyword, path, or regex pattern."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Keyword, path segment, or regex pattern to search for",
+                    },
+                    "target_type": {
+                        "type": "string",
+                        "enum": ["all", "crmscript", "screen", "action", "element"],
+                        "description": "Filter by target artifact type (default: all)",
+                        "default": "all",
+                    },
+                    "screen_name": {
+                        "type": "string",
+                        "description": "Optional screen name to scope search within",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 50,
+                        "description": "Maximum number of search items to return (default: 20)",
+                        "default": 20,
+                    },
+                },
+                "required": ["query"],
+            },
+        ),
+        Tool(
+            name="get_codebase_file",
+            description=(
+                "Safely retrieve the content of a mirrored CRMScript or screen definition file "
+                "with bounded line windowing and path traversal protection."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "relative_path": {
+                        "type": "string",
+                        "description": "Relative path of file inside codebase mirror",
+                    },
+                    "start_line": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "1-indexed starting line number (default: 1)",
+                        "default": 1,
+                    },
+                    "end_line": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "1-indexed ending line number (default: 100)",
+                        "default": 100,
+                    },
+                },
+                "required": ["relative_path"],
+            },
+        ),
+        Tool(
+            name="get_screen_details",
+            description=(
+                "Inspect the structural layout, constituent elements, button actions, and "
+                "associated lifecycle scripts of a SuperOffice screen by name or ID."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "screen_name_or_id": {
+                        "type": "string",
+                        "description": "Screen name (e.g. 'Create case') or numeric screen ID",
+                    },
+                },
+                "required": ["screen_name_or_id"],
+            },
+        ),
         # Diagnostics MCP Tools (L2 & L3)
         Tool(
             name="get_database_health",

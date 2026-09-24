@@ -90,6 +90,21 @@ tools:
     classification: READ_ONLY
     data_level: CONFIDENTIAL
     description: "Retrieve chronological audit trail and change history for a SuperOffice ticket"
+  search_codebase:
+    minimum_role: L1
+    classification: READ_ONLY
+    data_level: INTERNAL
+    description: "Search across mirrored SuperOffice CRMScripts, screen definitions, button actions, and elements"
+  get_codebase_file:
+    minimum_role: L2
+    classification: READ_ONLY
+    data_level: CONFIDENTIAL
+    description: "Safely retrieve source code content of a mirrored CRMScript or screen definition with line windowing"
+  get_screen_details:
+    minimum_role: L1
+    classification: READ_ONLY
+    data_level: INTERNAL
+    description: "Inspect the structural layout, elements, button actions, and lifecycle scripts of a SuperOffice screen"
   update_ticket_status:
     minimum_role: L2
     classification: SENSITIVE_WRITE

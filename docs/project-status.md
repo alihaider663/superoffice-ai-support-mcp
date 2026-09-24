@@ -134,12 +134,12 @@ To guarantee security and data minimization, each backend data source is exclusi
 
 ---
 
-## 5. Canonical Public Tool Inventory (Total 23)
+## 5. Canonical Public Tool Inventory (Total 26)
 
-The platform exposes exactly **23 canonical public tools** registered at the Gateway perimeter. There are zero aliases and zero public ingestion tools.
+The platform exposes exactly **26 canonical public tools** registered at the Gateway perimeter. There are zero aliases and zero public ingestion tools.
 
 ```text
-SuperOffice MCP (13)   Diagnostics MCP (6)    Knowledge MCP (3)    Investigation MCP (1)
+SuperOffice MCP (16)   Diagnostics MCP (6)    Knowledge MCP (3)    Investigation MCP (1)
 ────────────────────   ───────────────────    ─────────────────    ─────────────────────
 get_ticket             get_database_health    search_knowledge     investigate_incident
 search_tickets         find_slow_queries      get_runbook
@@ -154,6 +154,9 @@ list_extra_tables
 get_extra_table_schema
 query_extra_table
 get_ticket_audit_trail
+search_codebase
+get_codebase_file
+get_screen_details
 ```
 
 - **Infrastructure MCP**: 0 public tools (structural slot retained; implementation deferred under Decision `D07`).
@@ -175,7 +178,7 @@ The platform gateway registers and exposes **3 canonical MCP prompts** (`prompts
 
 ## 6. Registered Inventory vs. Current Operational Status
 
-The platform strictly distinguishes between **registered public contract inventory** and **current local operational status**. Not all 18 registered tools are operational in the local development environment:
+The platform strictly distinguishes between **registered public contract inventory** and **current local operational status**:
 
 | Tool Name | Server | Role / Classification / Level | Current Local Operational Status | Notes / Operational Reality |
 | :--- | :--- | :--- | :--- | :--- |
@@ -187,12 +190,20 @@ The platform strictly distinguishes between **registered public contract invento
 | `find_companies` | SuperOffice | L1 / READ_ONLY / INTERNAL | **OPERATIONAL** | Filtered search over company records. |
 | `get_person` | SuperOffice | L1 / READ_ONLY / INTERNAL | **OPERATIONAL** | Person / Contact lookup with PII redaction. |
 | `find_persons` | SuperOffice | L1 / READ_ONLY / INTERNAL | **OPERATIONAL** | Filtered search over person records. |
+| `sync_codebase` | SuperOffice | L2 / READ_ONLY / INTERNAL | **OPERATIONAL** | Mirrors CRMScripts, screens, and database schemas. |
+| `list_extra_tables` | SuperOffice | L2 / READ_ONLY / INTERNAL | **OPERATIONAL** | Discovers user-defined `y_*` extra tables. |
+| `get_extra_table_schema` | SuperOffice | L2 / READ_ONLY / INTERNAL | **OPERATIONAL** | Inspects column types and primary keys. |
+| `query_extra_table` | SuperOffice | L2 / READ_ONLY / CONFIDENTIAL | **OPERATIONAL** | Strictly bounded, parameterized reads. |
+| `get_ticket_audit_trail` | SuperOffice | L2 / READ_ONLY / CONFIDENTIAL | **OPERATIONAL** | Chronological ticket audit trail, actions, changes. |
+| `search_codebase` | SuperOffice | L1 / READ_ONLY / INTERNAL | **OPERATIONAL** | Fast query across mirrored scripts, screens, elements. |
+| `get_codebase_file` | SuperOffice | L2 / READ_ONLY / CONFIDENTIAL | **OPERATIONAL** | Reads mirrored code with 200-line windowing & PII scrub. |
+| `get_screen_details` | SuperOffice | L1 / READ_ONLY / INTERNAL | **OPERATIONAL** | Inspects screen lifecycle scripts, buttons, elements. |
 | `get_database_health` | Diagnostics | L2 / READ_ONLY / CONFIDENTIAL | **OPERATIONAL** | Live/Mock MSSQL DMV checks (5s timeout, SNAPSHOT). |
 | `find_slow_queries` | Diagnostics | L2 / READ_ONLY / CONFIDENTIAL | **OPERATIONAL** | Live/Mock DMV query analysis (capped at 50 rows). |
 | `find_deadlocks` | Diagnostics | L2 / READ_ONLY / CONFIDENTIAL | **OPERATIONAL** | Live/Mock system_health ring buffer parser. |
 | `find_blocking_sessions`| Diagnostics | L2 / READ_ONLY / CONFIDENTIAL | **OPERATIONAL** | Live/Mock session wait analysis. |
 | `search_logs` | Diagnostics | L2 / READ_ONLY / CONFIDENTIAL | **IMPLEMENTED / CONFIG-CONDITIONAL** | Operational when log directory configured; fails closed if enabled source fails. |
-| `get_ticket_diagnostic_record` | Diagnostics | L2 / READ_ONLY / CONFIDENTIAL | **REGISTERED / BLOCKED** | Fails closed with `DIAGNOSTIC_SCHEMA_NOT_CONFIGURED` pending DBA table schema verification. |
+| `get_ticket_diagnostic_record` | Diagnostics | L2 / READ_ONLY / CONFIDENTIAL | **OPERATIONAL** | Database diagnostic records (active / live telemetry). |
 | `search_knowledge` | Knowledge | L1 / READ_ONLY / INTERNAL | **CONFIGURED / LOCAL OPERATIONAL** | Local PostgreSQL + pgvector + FastEmbed (384-dim). |
 | `get_runbook` | Knowledge | L1 / READ_ONLY / INTERNAL | **CONFIGURED / LOCAL OPERATIONAL** | Fetches verified structured runbooks by ID. |
 | `find_known_issues` | Knowledge | L1 / READ_ONLY / INTERNAL | **CONFIGURED / LOCAL OPERATIONAL** | Semantic vector search across known issue corpus. |

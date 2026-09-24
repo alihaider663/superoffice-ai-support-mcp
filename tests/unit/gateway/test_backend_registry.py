@@ -77,9 +77,15 @@ def test_default_routing_table_contains_all_domains() -> None:
     assert table.get_route("query_extra_table").target_server == TargetServer.SUPEROFFICE
     assert table.has_route("get_ticket_audit_trail")
     assert table.get_route("get_ticket_audit_trail").target_server == TargetServer.SUPEROFFICE
+    assert table.has_route("search_codebase")
+    assert table.get_route("search_codebase").target_server == TargetServer.SUPEROFFICE
+    assert table.has_route("get_codebase_file")
+    assert table.get_route("get_codebase_file").target_server == TargetServer.SUPEROFFICE
+    assert table.has_route("get_screen_details")
+    assert table.get_route("get_screen_details").target_server == TargetServer.SUPEROFFICE
 
-    # Assert 23 total approved routes
-    assert len(table.routes) == 23
+    # Assert 26 total approved routes
+    assert len(table.routes) == 26
 
 
 def test_validate_routes_against_rbac_detects_missing_tool() -> None:

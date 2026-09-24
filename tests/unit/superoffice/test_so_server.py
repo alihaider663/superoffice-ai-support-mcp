@@ -10,6 +10,13 @@ from so_mcp.audit.contracts import (
     TicketAuditTrailDTO,
     TicketLogMilestoneDTO,
 )
+from so_mcp.codebase.contracts import (
+    CodebaseFileContentDTO,
+    CodebaseSearchItemDTO,
+    CodebaseSearchResultDTO,
+    ScreenDetailsDTO,
+    ScreenLifecycleScriptsDTO,
+)
 from so_mcp.contracts.dtos import TicketDetailDomainDTO
 from so_mcp.contracts.errors import SuperOfficeIntegrationError
 from so_mcp.extra_tables.contracts import (
@@ -41,6 +48,9 @@ def test_so_server_registers_all_approved_tools() -> None:
         "get_extra_table_schema",
         "query_extra_table",
         "get_ticket_audit_trail",
+        "search_codebase",
+        "get_codebase_file",
+        "get_screen_details",
     }
     assert tool_names == expected_tools
 
@@ -287,3 +297,59 @@ async def test_so_server_audit_trail_tools_invocation() -> None:
     assert res["total_actions"] == 1
     assert res["milestone_logs"][0]["actor"] == "junaid.tariq"
     mock_audit_service.get_ticket_audit_trail.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_so_server_codebase_tools_invocation() -> None:
+    """SuperOffice FastMCP server invokes codebase intelligence tools."""
+    mock_codebase = AsyncMock()
+    mock_codebase.search_codebase.return_value = CodebaseSearchResultDTO(
+        query="test",
+        target_type="all",
+        returned_count=1,
+        is_truncated=False,
+        items=(
+            CodebaseSearchItemDTO(
+                relative_path="crmscripts/test.crmscript",
+                file_type="crmscript",
+                size_bytes=100,
+            ),
+        ),
+    )
+    mock_codebase.get_codebase_file.return_value = CodebaseFileContentDTO(
+        relative_path="crmscripts/test.crmscript",
+        total_lines=5,
+        start_line=1,
+        end_line=5,
+        is_truncated=False,
+        content="print('test');",
+        sha256="abc123hash",
+    )
+    mock_codebase.get_screen_details.return_value = ScreenDetailsDTO(
+        screen_id=10,
+        screen_name="Create case",
+        title="Create Case",
+        relative_directory="screens/Create case",
+        lifecycle_scripts=ScreenLifecycleScriptsDTO(),
+        action_buttons=(),
+        element_count=0,
+        elements=(),
+    )
+
+    server = create_superoffice_mcp_server(codebase_service=mock_codebase)
+    tools = server._tool_manager._tools
+
+    # 1. search_codebase
+    search_res = await tools["search_codebase"].fn(query="test")
+    assert search_res["returned_count"] == 1
+    assert search_res["items"][0]["relative_path"] == "crmscripts/test.crmscript"
+
+    # 2. get_codebase_file
+    file_res = await tools["get_codebase_file"].fn(relative_path="crmscripts/test.crmscript")
+    assert file_res["content"] == "print('test');"
+    assert file_res["sha256"] == "abc123hash"
+
+    # 3. get_screen_details
+    screen_res = await tools["get_screen_details"].fn(screen_name_or_id="Create case")
+    assert screen_res["found"] is True
+    assert screen_res["screen_name"] == "Create case"

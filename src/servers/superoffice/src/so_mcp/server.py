@@ -10,6 +10,12 @@ from so_mcp.adapters.factory import create_superoffice_client
 from so_mcp.audit.contracts import TicketAuditCriteriaDTO
 from so_mcp.audit.factory import create_ticket_audit_service
 from so_mcp.audit.service import TicketAuditService
+from so_mcp.codebase.contracts import (
+    CodebaseFileRequestDTO,
+    CodebaseSearchCriteriaDTO,
+)
+from so_mcp.codebase.factory import create_codebase_intelligence_service
+from so_mcp.codebase.service import CodebaseIntelligenceService
 from so_mcp.contracts.dtos import (
     CompanySearchCriteriaDTO,
     PersonSearchCriteriaDTO,
@@ -40,12 +46,13 @@ ALLOWED_BACKEND_HOSTS = [
 ]
 
 
-def create_superoffice_mcp_server(  # noqa: PLR0915
+def create_superoffice_mcp_server(  # noqa: PLR0915, PLR0917
     service: SuperOfficeApplicationService | None = None,
     client: SuperOfficeClient | None = None,
     sync_service: SuperOfficeCodebaseSyncService | None = None,
     extra_table_service: ExtraTableService | None = None,
     audit_service: TicketAuditService | None = None,
+    codebase_service: CodebaseIntelligenceService | None = None,
 ) -> FastMCP:
     """Instantiate and configure the official FastMCP SuperOffice server.
 
@@ -294,6 +301,77 @@ def create_superoffice_mcp_server(  # noqa: PLR0915
         res = await active_audit_service.get_ticket_audit_trail(criteria)
         return res.model_dump(mode="json")
 
+    active_codebase_service = codebase_service
+
+    @mcp_server.tool(
+        name="search_codebase",
+        description=(
+            "Search across all mirrored SuperOffice CRMScripts, screen definitions, button "
+            "actions, and element creation scripts by keyword, path, or regex pattern."
+        ),
+    )
+    async def search_codebase(
+        query: str,
+        target_type: str = "all",
+        screen_name: str | None = None,
+        limit: int = 20,
+    ) -> dict[str, Any]:
+        nonlocal active_codebase_service
+        if active_codebase_service is None:
+            active_codebase_service = create_codebase_intelligence_service()
+        criteria = CodebaseSearchCriteriaDTO(
+            query=query,
+            target_type=target_type,  # type: ignore[arg-type]
+            screen_name=screen_name,
+            limit=limit,
+        )
+        res = await active_codebase_service.search_codebase(criteria)
+        return res.model_dump(mode="json")
+
+    @mcp_server.tool(
+        name="get_codebase_file",
+        description=(
+            "Safely retrieve the content of a mirrored CRMScript or screen definition file "
+            "with bounded line windowing and path traversal protection."
+        ),
+    )
+    async def get_codebase_file(
+        relative_path: str,
+        start_line: int = 1,
+        end_line: int = 100,
+    ) -> dict[str, Any]:
+        nonlocal active_codebase_service
+        if active_codebase_service is None:
+            active_codebase_service = create_codebase_intelligence_service()
+        req = CodebaseFileRequestDTO(
+            relative_path=relative_path,
+            start_line=start_line,
+            end_line=end_line,
+        )
+        res = await active_codebase_service.get_codebase_file(req)
+        return res.model_dump(mode="json")
+
+    @mcp_server.tool(
+        name="get_screen_details",
+        description=(
+            "Inspect the structural layout, constituent elements, button actions, and "
+            "associated lifecycle scripts of a SuperOffice screen by name or ID."
+        ),
+    )
+    async def get_screen_details(screen_name_or_id: str) -> dict[str, Any]:
+        nonlocal active_codebase_service
+        if active_codebase_service is None:
+            active_codebase_service = create_codebase_intelligence_service()
+        res = await active_codebase_service.get_screen_details(screen_name_or_id)
+        if res is None:
+            return {
+                "error": f"Screen '{screen_name_or_id}' not found in mirrored codebase.",
+                "found": False,
+            }
+        data = res.model_dump(mode="json")
+        data["found"] = True
+        return data
+
     return mcp_server
 
 
@@ -304,6 +382,7 @@ def create_app(  # noqa: PLR0917
     sync_service: SuperOfficeCodebaseSyncService | None = None,
     extra_table_service: ExtraTableService | None = None,
     audit_service: TicketAuditService | None = None,
+    codebase_service: CodebaseIntelligenceService | None = None,
 ) -> Starlette:
     """Create the Starlette ASGI application for SuperOffice MCP Server."""
     active_service = service
@@ -320,5 +399,6 @@ def create_app(  # noqa: PLR0917
         sync_service=sync_service,
         extra_table_service=extra_table_service,
         audit_service=audit_service,
+        codebase_service=codebase_service,
     )
     return server.streamable_http_app()

@@ -4,11 +4,11 @@
 
 The platform strictly separates responsibilities across dedicated MCP servers and architectural layers. Every capability has exactly one owner service.
 
-The platform registers exactly **23 canonical public tools** at the Gateway perimeter. There are zero aliases and zero public ingestion tools.
+The platform registers exactly **26 canonical public tools** at the Gateway perimeter. There are zero aliases and zero public ingestion tools.
 
 ```text
-Platform Public Inventory: 23 Tools
-├── SuperOffice MCP (13 tools)
+Platform Public Inventory: 26 Tools
+├── SuperOffice MCP (16 tools)
 ├── Diagnostics MCP (6 tools)
 ├── Knowledge MCP (3 tools)
 ├── Investigation MCP (1 tool)
@@ -20,7 +20,7 @@ Platform Public Inventory: 23 Tools
 ## 2. SuperOffice MCP Server (`so-mcp`)
 
 ### Purpose
-Provides controlled, read-only access to SuperOffice CRM entities and ticket operations via the SuperOffice REST WebAPI (v1) and read-only parameterized database queries for extra tables and audit trails.
+Provides controlled, read-only access to SuperOffice CRM entities and ticket operations via the SuperOffice REST WebAPI (v1), read-only parameterized database queries for extra tables and audit trails, and intelligence over mirrored CRMScripts and screen definitions.
 
 ### Owns
 * Ticket retrieval and filtered search
@@ -31,6 +31,7 @@ Provides controlled, read-only access to SuperOffice CRM entities and ticket ope
 * User-defined `y_*` extra table discovery, schema inspection, and querying
 * Ticket lifecycle audit trail, actions, and field transition history
 * Local codebase synchronization for scripts, screens, and schemas
+* Search, windowed inspection, and structural intelligence over mirrored CRMScripts and screens
 
 ### Does NOT Own
 * Diagnostic log inspection or host metrics
@@ -38,8 +39,9 @@ Provides controlled, read-only access to SuperOffice CRM entities and ticket ope
 * Raw attachment downloads (deny-by-default)
 * CRM write mutations (deferred in Local Development Release 1.0)
 * Unvalidated dynamic or arbitrary SQL queries
+* Arbitrary filesystem path traversal outside the mirrored codebase directory
 
-### Canonical Public Tools (13)
+### Canonical Public Tools (16)
 1. `get_ticket`: Retrieve full ticket details by ticket ID.
 2. `search_tickets`: Filtered ticket search with strict pagination.
 3. `get_ticket_messages`: Retrieve messages / replies associated with a ticket.
@@ -53,9 +55,12 @@ Provides controlled, read-only access to SuperOffice CRM entities and ticket ope
 11. `get_extra_table_schema`: Inspect columns, types, and primary keys of extra tables.
 12. `query_extra_table`: Execute strictly bounded and parameterized reads on extra tables.
 13. `get_ticket_audit_trail`: Chronological ticket audit trail, actions, and field changes.
+14. `search_codebase`: Search across mirrored CRMScripts, screens, actions, and elements with line-number excerpts.
+15. `get_codebase_file`: Read mirrored script or definition file content with 200-line chunk windows and path-traversal protection.
+16. `get_screen_details`: Structural inspection of screen lifecycle scripts, buttons, and visual elements.
 
 ### Operational Status
-All 13 tools are **OPERATIONAL** in local development with live MSSQL database integration and test fixtures.
+All 16 tools are **OPERATIONAL** in local development with live MSSQL database integration, mirrored codebase intelligence (`F:\CodeBase_SuperOffice`), and test fixtures.
 
 ### Subsystems & Alternate Runtimes
 - **Codebase Mirror & Synchronization Subsystem (`so_mcp.sync`)**:
