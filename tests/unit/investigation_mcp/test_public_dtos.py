@@ -343,7 +343,7 @@ class TestSourceOutcomeDTO:
             evidence=(),
         )
         dump = resp.model_dump()
-        assert set(dump.keys()) == {"source_outcomes", "evidence"}
+        assert set(dump.keys()) == {"source_outcomes", "evidence", "hypothesis_evaluation"}
 
     def test_slow_query_time_window_validation(self):
         t1 = datetime(2026, 9, 1, 10, 0, 0, tzinfo=UTC)

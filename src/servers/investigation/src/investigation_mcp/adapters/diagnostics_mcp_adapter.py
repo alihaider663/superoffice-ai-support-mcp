@@ -9,14 +9,19 @@ from mcp.client.streamable_http import streamable_http_client
 from mcp.types import CallToolResult, TextContent
 
 from diag_mcp.contracts.dtos import (
+    BlockingSessionCriteriaDTO,
+    BlockingSessionDomainDTO,
     BoundedDiagnosticResultDTO,
     DatabaseHealthDomainDTO,
     DeadlockCriteriaDTO,
     DeadlockDomainDTO,
+    SanitizedLogExcerptDTO,
     SlowQueryCriteriaDTO,
     SlowQueryDomainDTO,
+    TicketDiagnosticRecordDomainDTO,
 )
-from diag_mcp.contracts.errors import DatabaseDiagnosticError
+from diag_mcp.contracts.errors import DatabaseDiagnosticError, LogSearchError
+from platform_investigation_service.ports import DiagnosticsServicePort, LogsServicePort
 from platform_observability.logging import get_logger
 
 logger = get_logger(__name__)
@@ -25,16 +30,22 @@ logger = get_logger(__name__)
 TOOL_NAME_DATABASE_HEALTH = "get_database_health"
 TOOL_NAME_FIND_DEADLOCKS = "find_deadlocks"
 TOOL_NAME_FIND_SLOW_QUERIES = "find_slow_queries"
+TOOL_NAME_GET_TICKET_DIAGNOSTIC_RECORD = "get_ticket_diagnostic_record"
+TOOL_NAME_FIND_BLOCKING_SESSIONS = "find_blocking_sessions"
+TOOL_NAME_SEARCH_LOGS = "search_logs"
 
 
-class DiagnosticsMcpClientAdapter:
-    """Downstream MCP client adapter for MSSQL database diagnostics.
+class DiagnosticsMcpClientAdapter(DiagnosticsServicePort, LogsServicePort):
+    """Downstream MCP client adapter for MSSQL database diagnostics and logs.
 
-    Implements DiagnosticsServicePort using official MCP streamable_http_client.
-    Invokes strictly the three frozen diagnostic capabilities:
+    Implements DiagnosticsServicePort and LogsServicePort using official MCP streamable_http_client.
+    Invokes strictly the bounded diagnostic capabilities:
     - get_database_health
     - find_deadlocks
     - find_slow_queries
+    - get_ticket_diagnostic_record
+    - find_blocking_sessions
+    - search_logs
     """
 
     def __init__(
@@ -51,12 +62,7 @@ class DiagnosticsMcpClientAdapter:
         self._timeout_seconds = timeout_seconds
 
     def _build_headers(self) -> dict[str, str]:
-        """Construct minimal second-hop transport headers.
-
-        Under Phase 4.1 header minimization, backend MCP servers (so-mcp, diag-mcp)
-        contain no inbound correlation or identity consumers. Therefore, the
-        delegated/custom second-hop header set is strictly EMPTY.
-        """
+        """Construct minimal second-hop transport headers."""
         return {}
 
     def _extract_payload(self, tool_result: CallToolResult) -> Any:
@@ -122,6 +128,12 @@ class DiagnosticsMcpClientAdapter:
 
                 if tool_result.isError:
                     error_msg = self._extract_error_message(tool_result, tool_name)
+                    if tool_name == TOOL_NAME_SEARCH_LOGS and (
+                        "not configured" in error_msg.lower() or "blocked" in error_msg.lower()
+                    ):
+                        raise LogSearchError(
+                            error_msg, error_code="LOG_SEARCH_BACKEND_NOT_CONFIGURED"
+                        )
                     raise DatabaseDiagnosticError(
                         f"Downstream {tool_name} failed: {error_msg}",
                         error_code="DOWNSTREAM_DIAGNOSTICS_ERROR",
@@ -150,7 +162,7 @@ class DiagnosticsMcpClientAdapter:
                 f"Diagnostics MCP server returned HTTP status {exc.response.status_code}.",
                 error_code="DOWNSTREAM_UNAVAILABLE",
             ) from exc
-        except DatabaseDiagnosticError:
+        except (DatabaseDiagnosticError, LogSearchError):
             raise
         except Exception as exc:
             logger.error(
@@ -189,3 +201,35 @@ class DiagnosticsMcpClientAdapter:
         args: dict[str, Any] = criteria.model_dump(mode="json", exclude_none=True)
         raw_payload = await self._execute_tool_call(TOOL_NAME_FIND_SLOW_QUERIES, args)
         return BoundedDiagnosticResultDTO[SlowQueryDomainDTO].model_validate(raw_payload)
+
+    async def get_ticket_diagnostic_record(
+        self,
+        ticket_id: int,
+    ) -> TicketDiagnosticRecordDomainDTO | None:
+        """Fetch ticket database diagnostic record via downstream Diagnostics MCP server."""
+        raw_payload = await self._execute_tool_call(
+            TOOL_NAME_GET_TICKET_DIAGNOSTIC_RECORD, {"ticket_id": ticket_id}
+        )
+        if isinstance(raw_payload, dict) and raw_payload:
+            return TicketDiagnosticRecordDomainDTO.model_validate(raw_payload)
+        return None
+
+    async def find_blocking_sessions(
+        self,
+        criteria: BlockingSessionCriteriaDTO | None = None,
+    ) -> BoundedDiagnosticResultDTO[BlockingSessionDomainDTO]:
+        """Fetch active blocking session snapshot via downstream Diagnostics MCP server."""
+        _ = criteria
+        raw_payload = await self._execute_tool_call(TOOL_NAME_FIND_BLOCKING_SESSIONS, {})
+        return BoundedDiagnosticResultDTO[BlockingSessionDomainDTO].model_validate(raw_payload)
+
+    async def search_logs(
+        self,
+        query: str,
+        limit: int = 20,
+    ) -> BoundedDiagnosticResultDTO[SanitizedLogExcerptDTO]:
+        """Search application logs via downstream Diagnostics MCP server."""
+        raw_payload = await self._execute_tool_call(
+            TOOL_NAME_SEARCH_LOGS, {"query": query, "limit": limit}
+        )
+        return BoundedDiagnosticResultDTO[SanitizedLogExcerptDTO].model_validate(raw_payload)

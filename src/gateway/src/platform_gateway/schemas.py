@@ -1,5 +1,6 @@
-"""Canonical MCP Tool Definitions and Input Schemas for approved platform tools."""
+"""Canonical schema definitions for Gateway-exposed platform tools."""
 
+# ruff: noqa: E501
 from mcp.types import Tool
 
 INVESTIGATE_INCIDENT_INPUT_SCHEMA = {
@@ -8,51 +9,23 @@ INVESTIGATE_INCIDENT_INPUT_SCHEMA = {
             "additionalProperties": False,
             "description": "Public criteria for database deadlock analysis.",
             "properties": {
+                "start_time": {
+                    "anyOf": [{"format": "date-time", "type": "string"}, {"type": "null"}],
+                    "default": None,
+                    "description": "Start of observation time window with explicit offset (e.g. '...Z')",
+                    "title": "Start Time",
+                },
                 "end_time": {
                     "anyOf": [{"format": "date-time", "type": "string"}, {"type": "null"}],
                     "default": None,
-                    "description": "End "
-                    "of "
-                    "observation "
-                    "time "
-                    "window "
-                    "with "
-                    "explicit "
-                    "offset "
-                    "(e.g. "
-                    "'...Z')",
+                    "description": "End of observation time window with explicit offset (e.g. '...Z')",
                     "title": "End Time",
                 },
                 "limit": {
                     "anyOf": [{"maximum": 50, "minimum": 1, "type": "integer"}, {"type": "null"}],
                     "default": 10,
-                    "description": "Maximum "
-                    "deadlock "
-                    "events "
-                    "to "
-                    "return "
-                    "(1..50, "
-                    "default "
-                    "10, "
-                    "capped "
-                    "by "
-                    "D02)",
+                    "description": "Maximum deadlock events to return (1..50, default 10)",
                     "title": "Limit",
-                },
-                "start_time": {
-                    "anyOf": [{"format": "date-time", "type": "string"}, {"type": "null"}],
-                    "default": None,
-                    "description": "Start "
-                    "of "
-                    "observation "
-                    "time "
-                    "window "
-                    "with "
-                    "explicit "
-                    "offset "
-                    "(e.g. "
-                    "'...Z')",
-                    "title": "Start Time",
                 },
             },
             "title": "DeadlockInvestigationInputDTO",
@@ -62,97 +35,144 @@ INVESTIGATE_INCIDENT_INPUT_SCHEMA = {
             "additionalProperties": False,
             "description": "Public opt-in selection for database diagnostic checks.",
             "properties": {
-                "deadlocks": {
-                    "anyOf": [{"$ref": "#/$defs/DeadlockInvestigationInputDTO"}, {"type": "null"}],
-                    "default": None,
-                    "description": "Explicit opt-in criteria to search recent database deadlocks",
-                },
                 "include_database_health": {
                     "default": False,
                     "description": "Explicit opt-in to execute database health check",
                     "title": "Include Database Health",
                     "type": "boolean",
                 },
+                "deadlocks": {
+                    "anyOf": [{"$ref": "#/$defs/DeadlockInvestigationInputDTO"}, {"type": "null"}],
+                    "default": None,
+                    "description": "Explicit opt-in criteria to search recent database deadlocks",
+                },
                 "slow_queries": {
                     "anyOf": [{"$ref": "#/$defs/SlowQueryInvestigationInputDTO"}, {"type": "null"}],
                     "default": None,
-                    "description": "Explicit "
-                    "opt-in "
-                    "criteria "
-                    "to "
-                    "search "
-                    "slow "
-                    "executing "
-                    "database "
-                    "queries",
+                    "description": "Explicit opt-in criteria to search slow executing database queries",
+                },
+                "include_ticket_diagnostic": {
+                    "default": False,
+                    "description": "Explicit opt-in to inspect ticket database diagnostic record (y_logticket)",
+                    "title": "Include Ticket Diagnostic",
+                    "type": "boolean",
+                },
+                "include_blocking_sessions": {
+                    "default": False,
+                    "description": "Explicit opt-in to inspect active blocking sessions snapshot",
+                    "title": "Include Blocking Sessions",
+                    "type": "boolean",
                 },
             },
             "title": "InvestigationDiagnosticsInputDTO",
+            "type": "object",
+        },
+        "InvestigationKnowledgeInputDTO": {
+            "additionalProperties": False,
+            "description": "Public criteria for Knowledge Base search.",
+            "properties": {
+                "include_knowledge_search": {
+                    "default": True,
+                    "description": "Whether to search knowledge base for matching known issues and runbooks",
+                    "title": "Include Knowledge Search",
+                    "type": "boolean",
+                },
+                "query_override": {
+                    "anyOf": [{"maxLength": 256, "type": "string"}, {"type": "null"}],
+                    "default": None,
+                    "description": "Optional custom query for knowledge search (defaults to hypothesis/ticket)",
+                    "title": "Query Override",
+                },
+                "limit": {
+                    "default": 5,
+                    "description": "Maximum knowledge items to retrieve",
+                    "maximum": 20,
+                    "minimum": 1,
+                    "title": "Limit",
+                    "type": "integer",
+                },
+            },
+            "title": "InvestigationKnowledgeInputDTO",
+            "type": "object",
+        },
+        "InvestigationLogsInputDTO": {
+            "additionalProperties": False,
+            "description": "Public criteria for Application Logs search.",
+            "properties": {
+                "include_logs": {
+                    "default": False,
+                    "description": "Explicit opt-in to search application logs",
+                    "title": "Include Logs",
+                    "type": "boolean",
+                },
+                "query": {
+                    "anyOf": [{"maxLength": 256, "type": "string"}, {"type": "null"}],
+                    "default": None,
+                    "description": "Query text for log search",
+                    "title": "Query",
+                },
+                "limit": {
+                    "default": 20,
+                    "description": "Maximum log excerpts to retrieve",
+                    "maximum": 50,
+                    "minimum": 1,
+                    "title": "Limit",
+                    "type": "integer",
+                },
+            },
+            "title": "InvestigationLogsInputDTO",
+            "type": "object",
+        },
+        "InvestigationSuperOfficeInputDTO": {
+            "additionalProperties": False,
+            "description": "Public criteria for SuperOffice CRM evidence collection.",
+            "properties": {
+                "include_audit_trail": {
+                    "default": False,
+                    "description": "Explicit opt-in to retrieve ticket change history and audit trail",
+                    "title": "Include Audit Trail",
+                    "type": "boolean",
+                },
+                "audit_trail_limit": {
+                    "default": 20,
+                    "description": "Maximum audit trail events to retrieve",
+                    "maximum": 100,
+                    "minimum": 1,
+                    "title": "Audit Trail Limit",
+                    "type": "integer",
+                },
+            },
+            "title": "InvestigationSuperOfficeInputDTO",
             "type": "object",
         },
         "SlowQueryInvestigationInputDTO": {
             "additionalProperties": False,
             "description": "Public criteria for database slow query analysis.",
             "properties": {
+                "start_time": {
+                    "anyOf": [{"format": "date-time", "type": "string"}, {"type": "null"}],
+                    "default": None,
+                    "description": "Start of observation time window with explicit offset (e.g. '...Z')",
+                    "title": "Start Time",
+                },
                 "end_time": {
                     "anyOf": [{"format": "date-time", "type": "string"}, {"type": "null"}],
                     "default": None,
-                    "description": "End "
-                    "of "
-                    "observation "
-                    "time "
-                    "window "
-                    "with "
-                    "explicit "
-                    "offset "
-                    "(e.g. "
-                    "'...Z')",
+                    "description": "End of observation time window with explicit offset (e.g. '...Z')",
                     "title": "End Time",
-                },
-                "limit": {
-                    "anyOf": [{"maximum": 50, "minimum": 1, "type": "integer"}, {"type": "null"}],
-                    "default": 10,
-                    "description": "Maximum "
-                    "slow "
-                    "queries "
-                    "to "
-                    "return "
-                    "(1..50, "
-                    "default "
-                    "10, "
-                    "capped "
-                    "by "
-                    "D02)",
-                    "title": "Limit",
                 },
                 "min_duration_ms": {
                     "default": 1000,
-                    "description": "Minimum "
-                    "execution "
-                    "duration "
-                    "threshold "
-                    "in "
-                    "milliseconds "
-                    "(default "
-                    "1000ms)",
+                    "description": "Minimum execution duration threshold in milliseconds (default 1000ms)",
                     "minimum": 1,
                     "title": "Min Duration Ms",
                     "type": "integer",
                 },
-                "start_time": {
-                    "anyOf": [{"format": "date-time", "type": "string"}, {"type": "null"}],
-                    "default": None,
-                    "description": "Start "
-                    "of "
-                    "observation "
-                    "time "
-                    "window "
-                    "with "
-                    "explicit "
-                    "offset "
-                    "(e.g. "
-                    "'...Z')",
-                    "title": "Start Time",
+                "limit": {
+                    "anyOf": [{"maximum": 50, "minimum": 1, "type": "integer"}, {"type": "null"}],
+                    "default": 10,
+                    "description": "Maximum slow queries to return (1..50, default 10)",
+                    "title": "Limit",
                 },
             },
             "title": "SlowQueryInvestigationInputDTO",
@@ -162,11 +182,6 @@ INVESTIGATE_INCIDENT_INPUT_SCHEMA = {
     "additionalProperties": False,
     "description": "Public MCP input contract for cross-domain incident investigation.",
     "properties": {
-        "diagnostics": {
-            "anyOf": [{"$ref": "#/$defs/InvestigationDiagnosticsInputDTO"}, {"type": "null"}],
-            "default": None,
-            "description": "Optional database diagnostic checks to execute",
-        },
         "initial_hypothesis": {
             "description": "Explicit incident hypothesis to investigate",
             "maxLength": 256,
@@ -180,6 +195,26 @@ INVESTIGATE_INCIDENT_INPUT_SCHEMA = {
             "description": "Optional SuperOffice ticket ID to collect CRM ticket context",
             "title": "Ticket Id",
         },
+        "superoffice": {
+            "anyOf": [{"$ref": "#/$defs/InvestigationSuperOfficeInputDTO"}, {"type": "null"}],
+            "default": None,
+            "description": "Optional SuperOffice CRM collection criteria (e.g. audit trail)",
+        },
+        "diagnostics": {
+            "anyOf": [{"$ref": "#/$defs/InvestigationDiagnosticsInputDTO"}, {"type": "null"}],
+            "default": None,
+            "description": "Optional database diagnostic checks to execute",
+        },
+        "knowledge": {
+            "anyOf": [{"$ref": "#/$defs/InvestigationKnowledgeInputDTO"}, {"type": "null"}],
+            "default": None,
+            "description": "Optional knowledge base search options",
+        },
+        "logs": {
+            "anyOf": [{"$ref": "#/$defs/InvestigationLogsInputDTO"}, {"type": "null"}],
+            "default": None,
+            "description": "Optional application logs search options",
+        },
     },
     "required": ["initial_hypothesis"],
     "title": "InvestigateIncidentRequestDTO",
@@ -188,30 +223,66 @@ INVESTIGATE_INCIDENT_INPUT_SCHEMA = {
 
 INVESTIGATE_INCIDENT_OUTPUT_SCHEMA = {
     "$defs": {
+        "BlockingSessionObservationDTO": {
+            "additionalProperties": False,
+            "description": "MSSQL active blocking session observation.",
+            "properties": {
+                "observation_type": {
+                    "const": "blocking_session",
+                    "default": "blocking_session",
+                    "title": "Observation Type",
+                    "type": "string",
+                },
+                "blocking_session_id": {
+                    "description": "Head blocking session ID",
+                    "title": "Blocking Session Id",
+                    "type": "integer",
+                },
+                "blocked_session_id": {
+                    "description": "Blocked session ID",
+                    "title": "Blocked Session Id",
+                    "type": "integer",
+                },
+                "wait_duration_ms": {
+                    "description": "Wait duration in milliseconds",
+                    "title": "Wait Duration Ms",
+                    "type": "integer",
+                },
+                "wait_type": {
+                    "default": "",
+                    "description": "MSSQL wait resource/type",
+                    "title": "Wait Type",
+                    "type": "string",
+                },
+            },
+            "required": ["blocking_session_id", "blocked_session_id", "wait_duration_ms"],
+            "title": "BlockingSessionObservationDTO",
+            "type": "object",
+        },
         "DatabaseHealthObservationDTO": {
             "additionalProperties": False,
             "description": "MSSQL database cluster health observation.",
             "properties": {
-                "active_connections": {
-                    "description": "Current active connection count",
-                    "title": "Active Connections",
-                    "type": "integer",
+                "observation_type": {
+                    "const": "database_health",
+                    "default": "database_health",
+                    "title": "Observation Type",
+                    "type": "string",
                 },
                 "is_healthy": {
                     "description": "Whether database is responsive and healthy",
                     "title": "Is Healthy",
                     "type": "boolean",
                 },
+                "active_connections": {
+                    "description": "Current active connection count",
+                    "title": "Active Connections",
+                    "type": "integer",
+                },
                 "latency_ms": {
                     "description": "Database probe latency in milliseconds",
                     "title": "Latency Ms",
                     "type": "number",
-                },
-                "observation_type": {
-                    "const": "database_health",
-                    "default": "database_health",
-                    "title": "Observation Type",
-                    "type": "string",
                 },
             },
             "required": ["is_healthy", "active_connections", "latency_ms"],
@@ -222,25 +293,25 @@ INVESTIGATE_INCIDENT_OUTPUT_SCHEMA = {
             "additionalProperties": False,
             "description": "MSSQL database deadlock observation.",
             "properties": {
-                "deadlock_id": {
-                    "description": "Deterministic deadlock event identifier",
-                    "title": "Deadlock Id",
-                    "type": "string",
-                },
                 "observation_type": {
                     "const": "deadlock",
                     "default": "deadlock",
                     "title": "Observation Type",
                     "type": "string",
                 },
-                "participating_session_count": {
-                    "description": "Number of sessions participating in deadlock",
-                    "title": "Participating Session Count",
-                    "type": "integer",
+                "deadlock_id": {
+                    "description": "Deterministic deadlock event identifier",
+                    "title": "Deadlock Id",
+                    "type": "string",
                 },
                 "victim_session_id": {
                     "description": "Session ID chosen as deadlock victim",
                     "title": "Victim Session Id",
+                    "type": "integer",
+                },
+                "participating_session_count": {
+                    "description": "Number of sessions participating in deadlock",
+                    "title": "Participating Session Count",
                     "type": "integer",
                 },
             },
@@ -252,28 +323,14 @@ INVESTIGATE_INCIDENT_OUTPUT_SCHEMA = {
             "additionalProperties": False,
             "description": "Public representation of an observed diagnostic finding.",
             "properties": {
-                "data": {
-                    "description": "Structured observation payload conforming to observation_type",
-                    "discriminator": {
-                        "mapping": {
-                            "database_health": "#/$defs/DatabaseHealthObservationDTO",
-                            "deadlock": "#/$defs/DeadlockObservationDTO",
-                            "slow_query": "#/$defs/SlowQueryObservationDTO",
-                            "ticket": "#/$defs/TicketObservationDTO",
-                        },
-                        "propertyName": "observation_type",
-                    },
-                    "oneOf": [
-                        {"$ref": "#/$defs/TicketObservationDTO"},
-                        {"$ref": "#/$defs/DatabaseHealthObservationDTO"},
-                        {"$ref": "#/$defs/DeadlockObservationDTO"},
-                        {"$ref": "#/$defs/SlowQueryObservationDTO"},
-                    ],
-                    "title": "Data",
-                },
                 "source": {
                     "description": "Originating domain source",
-                    "enum": ["superoffice_crm", "mssql_diagnostics"],
+                    "enum": [
+                        "superoffice_crm",
+                        "mssql_diagnostics",
+                        "application_logs",
+                        "knowledge_base",
+                    ],
                     "title": "Source",
                     "type": "string",
                 },
@@ -283,15 +340,83 @@ INVESTIGATE_INCIDENT_OUTPUT_SCHEMA = {
                     "title": "Timestamp",
                     "type": "string",
                 },
+                "data": {
+                    "description": "Structured observation payload conforming to observation_type",
+                    "discriminator": {
+                        "mapping": {
+                            "blocking_session": "#/$defs/BlockingSessionObservationDTO",
+                            "database_health": "#/$defs/DatabaseHealthObservationDTO",
+                            "deadlock": "#/$defs/DeadlockObservationDTO",
+                            "knowledge_article": "#/$defs/KnowledgeArticleObservationDTO",
+                            "known_issue": "#/$defs/KnownIssueObservationDTO",
+                            "log_excerpt": "#/$defs/LogExcerptObservationDTO",
+                            "slow_query": "#/$defs/SlowQueryObservationDTO",
+                            "ticket": "#/$defs/TicketObservationDTO",
+                            "ticket_audit": "#/$defs/TicketAuditObservationDTO",
+                            "ticket_diagnostic": "#/$defs/TicketDiagnosticObservationDTO",
+                        },
+                        "propertyName": "observation_type",
+                    },
+                    "oneOf": [
+                        {"$ref": "#/$defs/TicketObservationDTO"},
+                        {"$ref": "#/$defs/TicketAuditObservationDTO"},
+                        {"$ref": "#/$defs/DatabaseHealthObservationDTO"},
+                        {"$ref": "#/$defs/DeadlockObservationDTO"},
+                        {"$ref": "#/$defs/SlowQueryObservationDTO"},
+                        {"$ref": "#/$defs/TicketDiagnosticObservationDTO"},
+                        {"$ref": "#/$defs/BlockingSessionObservationDTO"},
+                        {"$ref": "#/$defs/LogExcerptObservationDTO"},
+                        {"$ref": "#/$defs/KnownIssueObservationDTO"},
+                        {"$ref": "#/$defs/KnowledgeArticleObservationDTO"},
+                    ],
+                    "title": "Data",
+                },
             },
             "required": ["source", "timestamp", "data"],
             "title": "DiagnosticEvidenceWireDTO",
+            "type": "object",
+        },
+        "HypothesisEvaluationWireDTO": {
+            "additionalProperties": False,
+            "description": "Grounded evaluation outcome for an incident hypothesis.",
+            "properties": {
+                "hypothesis_id": {
+                    "description": "Target hypothesis identifier",
+                    "title": "Hypothesis Id",
+                    "type": "string",
+                },
+                "outcome": {
+                    "description": "Deterministic evaluation outcome",
+                    "enum": ["SUPPORTED", "REFUTED", "INCONCLUSIVE", "UNEVALUATED"],
+                    "title": "Outcome",
+                    "type": "string",
+                },
+            },
+            "required": ["hypothesis_id", "outcome"],
+            "title": "HypothesisEvaluationWireDTO",
             "type": "object",
         },
         "InvestigationSourceOutcomeWireDTO": {
             "additionalProperties": False,
             "description": "Sanitized diagnostic source status report.",
             "properties": {
+                "source": {
+                    "description": "Domain source identifier",
+                    "enum": [
+                        "superoffice_crm",
+                        "mssql_diagnostics",
+                        "application_logs",
+                        "knowledge_base",
+                    ],
+                    "title": "Source",
+                    "type": "string",
+                },
+                "status": {
+                    "description": "Collection status across the domain source",
+                    "enum": ["SUCCESS", "NOT_CONFIGURED", "BLOCKED", "UNAVAILABLE", "FAILED"],
+                    "title": "Status",
+                    "type": "string",
+                },
                 "error_code": {
                     "anyOf": [
                         {
@@ -318,52 +443,153 @@ INVESTIGATE_INCIDENT_OUTPUT_SCHEMA = {
                     "description": "Safe, sanitized explanation if collection was not successful",
                     "title": "Error Message",
                 },
-                "source": {
-                    "description": "Domain source identifier",
-                    "enum": [
-                        "superoffice_crm",
-                        "mssql_diagnostics",
-                        "application_logs",
-                        "knowledge_base",
-                    ],
-                    "title": "Source",
-                    "type": "string",
-                },
-                "status": {
-                    "description": "Collection status across the domain source",
-                    "enum": ["SUCCESS", "NOT_CONFIGURED", "BLOCKED", "UNAVAILABLE", "FAILED"],
-                    "title": "Status",
-                    "type": "string",
-                },
             },
             "required": ["source", "status"],
             "title": "InvestigationSourceOutcomeWireDTO",
+            "type": "object",
+        },
+        "KnowledgeArticleObservationDTO": {
+            "additionalProperties": False,
+            "description": "Knowledge base article or runbook documentation observation.",
+            "properties": {
+                "observation_type": {
+                    "const": "knowledge_article",
+                    "default": "knowledge_article",
+                    "title": "Observation Type",
+                    "type": "string",
+                },
+                "document_id": {
+                    "description": "Document identifier",
+                    "title": "Document Id",
+                    "type": "string",
+                },
+                "title": {"description": "Article title", "title": "Title", "type": "string"},
+                "content_excerpt": {
+                    "description": "Excerpt content",
+                    "title": "Content Excerpt",
+                    "type": "string",
+                },
+                "category": {
+                    "description": "Article category",
+                    "title": "Category",
+                    "type": "string",
+                },
+                "relevance_score": {
+                    "description": "Relevance score",
+                    "title": "Relevance Score",
+                    "type": "number",
+                },
+                "source_reference": {
+                    "description": "Source reference",
+                    "title": "Source Reference",
+                    "type": "string",
+                },
+            },
+            "required": [
+                "document_id",
+                "title",
+                "content_excerpt",
+                "category",
+                "relevance_score",
+                "source_reference",
+            ],
+            "title": "KnowledgeArticleObservationDTO",
+            "type": "object",
+        },
+        "KnownIssueObservationDTO": {
+            "additionalProperties": False,
+            "description": "Knowledge base verified known issue observation.",
+            "properties": {
+                "observation_type": {
+                    "const": "known_issue",
+                    "default": "known_issue",
+                    "title": "Observation Type",
+                    "type": "string",
+                },
+                "issue_id": {
+                    "description": "Known issue identifier",
+                    "title": "Issue Id",
+                    "type": "string",
+                },
+                "title": {
+                    "description": "Known issue summary title",
+                    "title": "Title",
+                    "type": "string",
+                },
+                "symptom_summary": {
+                    "description": "Observable symptoms",
+                    "title": "Symptom Summary",
+                    "type": "string",
+                },
+                "root_cause_summary": {
+                    "description": "Root cause explanation",
+                    "title": "Root Cause Summary",
+                    "type": "string",
+                },
+                "workaround": {
+                    "anyOf": [{"type": "string"}, {"type": "null"}],
+                    "default": None,
+                    "description": "Recommended workaround",
+                    "title": "Workaround",
+                },
+                "permanent_fix_reference": {
+                    "anyOf": [{"type": "string"}, {"type": "null"}],
+                    "default": None,
+                    "description": "Fix reference or hotfix ID",
+                    "title": "Permanent Fix Reference",
+                },
+                "affected_products": {
+                    "description": "Affected products",
+                    "items": {"type": "string"},
+                    "title": "Affected Products",
+                    "type": "array",
+                },
+            },
+            "required": ["issue_id", "title", "symptom_summary", "root_cause_summary"],
+            "title": "KnownIssueObservationDTO",
+            "type": "object",
+        },
+        "LogExcerptObservationDTO": {
+            "additionalProperties": False,
+            "description": "Sanitized application or API log excerpt observation.",
+            "properties": {
+                "observation_type": {
+                    "const": "log_excerpt",
+                    "default": "log_excerpt",
+                    "title": "Observation Type",
+                    "type": "string",
+                },
+                "excerpt_id": {
+                    "description": "Unique log excerpt identifier",
+                    "title": "Excerpt Id",
+                    "type": "string",
+                },
+                "service_name": {
+                    "description": "Originating service name",
+                    "title": "Service Name",
+                    "type": "string",
+                },
+                "severity": {"description": "Log severity", "title": "Severity", "type": "string"},
+                "sanitized_message": {
+                    "description": "Sanitized log message",
+                    "title": "Sanitized Message",
+                    "type": "string",
+                },
+                "correlation_id": {
+                    "anyOf": [{"type": "string"}, {"type": "null"}],
+                    "default": None,
+                    "description": "Request correlation identifier",
+                    "title": "Correlation Id",
+                },
+            },
+            "required": ["excerpt_id", "service_name", "severity", "sanitized_message"],
+            "title": "LogExcerptObservationDTO",
             "type": "object",
         },
         "SlowQueryObservationDTO": {
             "additionalProperties": False,
             "description": "MSSQL slow-running query observation.",
             "properties": {
-                "cpu_time_ms": {
-                    "description": "CPU processing time in milliseconds",
-                    "title": "Cpu Time Ms",
-                    "type": "integer",
-                },
-                "duration_ms": {
-                    "description": "Total execution duration in milliseconds",
-                    "title": "Duration Ms",
-                    "type": "integer",
-                },
-                "execution_count": {
-                    "description": "Number of executions recorded",
-                    "title": "Execution Count",
-                    "type": "integer",
-                },
-                "logical_reads": {
-                    "description": "Number of logical page reads",
-                    "title": "Logical Reads",
-                    "type": "integer",
-                },
                 "observation_type": {
                     "const": "slow_query",
                     "default": "slow_query",
@@ -374,6 +600,26 @@ INVESTIGATE_INCIDENT_OUTPUT_SCHEMA = {
                     "description": "Stable query plan hash identifier",
                     "title": "Query Hash",
                     "type": "string",
+                },
+                "duration_ms": {
+                    "description": "Total execution duration in milliseconds",
+                    "title": "Duration Ms",
+                    "type": "integer",
+                },
+                "cpu_time_ms": {
+                    "description": "CPU processing time in milliseconds",
+                    "title": "Cpu Time Ms",
+                    "type": "integer",
+                },
+                "logical_reads": {
+                    "description": "Number of logical page reads",
+                    "title": "Logical Reads",
+                    "type": "integer",
+                },
+                "execution_count": {
+                    "description": "Number of executions recorded",
+                    "title": "Execution Count",
+                    "type": "integer",
                 },
             },
             "required": [
@@ -386,39 +632,116 @@ INVESTIGATE_INCIDENT_OUTPUT_SCHEMA = {
             "title": "SlowQueryObservationDTO",
             "type": "object",
         },
+        "TicketAuditObservationDTO": {
+            "additionalProperties": False,
+            "description": "SuperOffice CRM ticket audit trail action observation.",
+            "properties": {
+                "observation_type": {
+                    "const": "ticket_audit",
+                    "default": "ticket_audit",
+                    "title": "Observation Type",
+                    "type": "string",
+                },
+                "action_id": {
+                    "description": "Unique action identifier",
+                    "title": "Action Id",
+                    "type": "integer",
+                },
+                "ticket_id": {
+                    "description": "SuperOffice ticket identifier",
+                    "title": "Ticket Id",
+                    "type": "integer",
+                },
+                "action_code": {
+                    "anyOf": [{"type": "integer"}, {"type": "null"}],
+                    "default": None,
+                    "description": "SuperOffice action code",
+                    "title": "Action Code",
+                },
+                "action_name": {
+                    "description": "Descriptive action title",
+                    "title": "Action Name",
+                    "type": "string",
+                },
+                "description": {
+                    "default": "",
+                    "description": "Action description",
+                    "title": "Description",
+                    "type": "string",
+                },
+                "actor": {
+                    "anyOf": [{"type": "string"}, {"type": "null"}],
+                    "default": None,
+                    "description": "Actor login name or user ID representation",
+                    "title": "Actor",
+                },
+                "field_changes": {
+                    "description": "Granular field mutations associated with this action",
+                    "items": {"additionalProperties": True, "type": "object"},
+                    "title": "Field Changes",
+                    "type": "array",
+                },
+            },
+            "required": ["action_id", "ticket_id", "action_name"],
+            "title": "TicketAuditObservationDTO",
+            "type": "object",
+        },
+        "TicketDiagnosticObservationDTO": {
+            "additionalProperties": False,
+            "description": "MSSQL ticket database diagnostic activity observation.",
+            "properties": {
+                "observation_type": {
+                    "const": "ticket_diagnostic",
+                    "default": "ticket_diagnostic",
+                    "title": "Observation Type",
+                    "type": "string",
+                },
+                "ticket_id": {
+                    "description": "SuperOffice ticket identifier",
+                    "title": "Ticket Id",
+                    "type": "integer",
+                },
+                "has_db_activity": {
+                    "description": "Whether ticket has DB diagnostic activity",
+                    "title": "Has Db Activity",
+                    "type": "boolean",
+                },
+                "recent_error_count": {
+                    "description": "Count of recent errors matching ticket",
+                    "title": "Recent Error Count",
+                    "type": "integer",
+                },
+                "last_activity_time": {
+                    "anyOf": [{"format": "date-time", "type": "string"}, {"type": "null"}],
+                    "default": None,
+                    "description": "Timestamp of latest DB activity",
+                    "title": "Last Activity Time",
+                },
+                "diagnostic_summary": {
+                    "description": "Database diagnostic summary",
+                    "title": "Diagnostic Summary",
+                    "type": "string",
+                },
+            },
+            "required": [
+                "ticket_id",
+                "has_db_activity",
+                "recent_error_count",
+                "diagnostic_summary",
+            ],
+            "title": "TicketDiagnosticObservationDTO",
+            "type": "object",
+        },
         "TicketObservationDTO": {
             "additionalProperties": False,
             "description": "SuperOffice CRM ticket observation.",
             "properties": {
-                "category": {
-                    "description": "Ticket category",
-                    "title": "Category",
-                    "type": "string",
-                },
                 "observation_type": {
                     "const": "ticket",
                     "default": "ticket",
                     "title": "Observation Type",
                     "type": "string",
                 },
-                "priority": {
-                    "description": "Ticket priority level",
-                    "title": "Priority",
-                    "type": "string",
-                },
-                "sanitized_customer_reference": {
-                    "anyOf": [{"type": "string"}, {"type": "null"}],
-                    "default": None,
-                    "description": "Sanitized customer reference identifier",
-                    "title": "Sanitized Customer Reference",
-                },
-                "sanitized_description": {
-                    "anyOf": [{"type": "string"}, {"type": "null"}],
-                    "default": None,
-                    "description": "Sanitized ticket problem description or symptom text",
-                    "title": "Sanitized Description",
-                },
-                "status": {"description": "Ticket status", "title": "Status", "type": "string"},
                 "ticket_id": {
                     "description": "SuperOffice ticket identifier",
                     "title": "Ticket Id",
@@ -430,6 +753,29 @@ INVESTIGATE_INCIDENT_OUTPUT_SCHEMA = {
                     "description": "Sanitized ticket subject or title",
                     "title": "Title",
                 },
+                "status": {"description": "Ticket status", "title": "Status", "type": "string"},
+                "category": {
+                    "description": "Ticket category",
+                    "title": "Category",
+                    "type": "string",
+                },
+                "priority": {
+                    "description": "Ticket priority level",
+                    "title": "Priority",
+                    "type": "string",
+                },
+                "sanitized_description": {
+                    "anyOf": [{"type": "string"}, {"type": "null"}],
+                    "default": None,
+                    "description": "Sanitized ticket problem description or symptom text",
+                    "title": "Sanitized Description",
+                },
+                "sanitized_customer_reference": {
+                    "anyOf": [{"type": "string"}, {"type": "null"}],
+                    "default": None,
+                    "description": "Sanitized customer reference identifier",
+                    "title": "Sanitized Customer Reference",
+                },
             },
             "required": ["ticket_id", "status", "category", "priority"],
             "title": "TicketObservationDTO",
@@ -439,20 +785,23 @@ INVESTIGATE_INCIDENT_OUTPUT_SCHEMA = {
     "additionalProperties": False,
     "description": "Immutable public wire contract for incident investigation results.",
     "properties": {
-        "evidence": {
-            "default": [],
-            "description": "Chronologically ordered "
-            "diagnostic evidence items "
-            "observed across sources",
-            "items": {"$ref": "#/$defs/DiagnosticEvidenceWireDTO"},
-            "title": "Evidence",
-            "type": "array",
-        },
         "source_outcomes": {
             "description": "Diagnostic coverage and collection status across each domain source",
             "items": {"$ref": "#/$defs/InvestigationSourceOutcomeWireDTO"},
             "title": "Source Outcomes",
             "type": "array",
+        },
+        "evidence": {
+            "default": [],
+            "description": "Chronologically ordered diagnostic evidence items observed across sources",
+            "items": {"$ref": "#/$defs/DiagnosticEvidenceWireDTO"},
+            "title": "Evidence",
+            "type": "array",
+        },
+        "hypothesis_evaluation": {
+            "anyOf": [{"$ref": "#/$defs/HypothesisEvaluationWireDTO"}, {"type": "null"}],
+            "default": None,
+            "description": "Deterministic evaluation outcome of the incident hypothesis",
         },
     },
     "required": ["source_outcomes"],
@@ -805,7 +1154,7 @@ def get_platform_tool_schemas() -> list[Tool]:
                     "include_field_changes": {
                         "type": "boolean",
                         "description": (
-                            "Whether to include granular field transitions (default: true)"
+                            "Whether to include granular field transitions (default: True)"
                         ),
                         "default": True,
                     },
@@ -949,7 +1298,7 @@ def get_platform_tool_schemas() -> list[Tool]:
                 "properties": {
                     "include_disabled": {
                         "type": "boolean",
-                        "description": "Include disabled scheduled tasks (default: true)",
+                        "description": "Include disabled scheduled tasks (default: True)",
                         "default": True,
                     },
                     "only_errors": {

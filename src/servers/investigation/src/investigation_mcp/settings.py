@@ -33,6 +33,10 @@ class InvestigationServerSettings(BasePlatformSettings):
         default=HttpUrl("http://127.0.0.1:8002"),
         description="Endpoint URL for downstream Diagnostics MCP server",
     )
+    knowledge_mcp_url: HttpUrl | None = Field(
+        default=None,
+        description="Endpoint URL for downstream Knowledge Base MCP server (optional)",
+    )
     timeout_seconds: PositiveInt = Field(
         default=30,
         description="HTTP request timeout for downstream MCP server calls",

@@ -1,6 +1,7 @@
-"""SuperOffice MCP client adapter satisfying Layer-4 SuperOfficeServicePort."""
+"""Knowledge Base MCP client adapter satisfying Layer-4 KnowledgeServicePort."""
 
 import json
+from collections.abc import Sequence
 from typing import Any
 
 import httpx
@@ -8,30 +9,37 @@ from mcp.client.session import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 from mcp.types import CallToolResult, TextContent
 
-from platform_investigation_service.ports import SuperOfficeServicePort
+from kb_mcp.contracts.dtos import (
+    KnowledgeSearchCriteriaDTO,
+    KnowledgeSearchResultDomainDTO,
+    KnownIssueDomainDTO,
+    KnownIssueSearchCriteriaDTO,
+    RunbookDetailDomainDTO,
+)
+from kb_mcp.contracts.errors import KnowledgeBackendNotConfiguredError, KnowledgeSearchError
+from platform_investigation_service.ports import KnowledgeServicePort
 from platform_observability.logging import get_logger
-from so_mcp.audit.contracts import TicketAuditTrailDTO
-from so_mcp.contracts.dtos import MinimizedTicketDetailDTO
-from so_mcp.contracts.errors import SuperOfficeIntegrationError
 
 logger = get_logger(__name__)
 
-# Fixed internal tool names for SuperOffice capabilities
-TOOL_NAME_GET_TICKET = "get_ticket"
-TOOL_NAME_GET_TICKET_AUDIT_TRAIL = "get_ticket_audit_trail"
+TOOL_NAME_SEARCH_KNOWLEDGE = "search_knowledge"
+TOOL_NAME_FIND_KNOWN_ISSUES = "find_known_issues"
+TOOL_NAME_GET_RUNBOOK = "get_runbook"
 
 
-class SuperOfficeMcpClientAdapter(SuperOfficeServicePort):
-    """Downstream MCP client adapter for SuperOffice CRM operations.
+class KnowledgeMcpClientAdapter(KnowledgeServicePort):
+    """Downstream MCP client adapter for Knowledge Base and Runbooks.
 
-    Implements SuperOfficeServicePort using official MCP streamable_http_client.
-    Passes only minimum necessary headers and invokes strictly
-    the ticket and audit capabilities.
+    Implements KnowledgeServicePort using official MCP streamable_http_client.
+    Invokes strictly the three knowledge capabilities:
+    - search_knowledge
+    - find_known_issues
+    - get_runbook
     """
 
     def __init__(
         self,
-        base_url: str = "http://127.0.0.1:8001",
+        base_url: str = "http://127.0.0.1:8003",
         endpoint_path: str = "/mcp",
         http_client: httpx.AsyncClient | None = None,
         *,
@@ -43,11 +51,9 @@ class SuperOfficeMcpClientAdapter(SuperOfficeServicePort):
         self._timeout_seconds = timeout_seconds
 
     def _build_headers(self) -> dict[str, str]:
-        """Construct minimal second-hop transport headers."""
         return {}
 
     def _extract_payload(self, tool_result: CallToolResult) -> Any:
-        """Extract structured or text JSON payload from CallToolResult."""
         if tool_result.structuredContent is not None:
             return tool_result.structuredContent
 
@@ -64,13 +70,10 @@ class SuperOfficeMcpClientAdapter(SuperOfficeServicePort):
             return {"raw_text": joined_text}
 
     def _extract_error_message(self, tool_result: CallToolResult, tool_name: str) -> str:
-        """Extract human-readable error text from failed CallToolResult."""
         for item in tool_result.content:
             if isinstance(item, TextContent) and item.text.strip():
                 return item.text.strip()
-        if tool_name == TOOL_NAME_GET_TICKET:
-            return "SuperOffice MCP get_ticket returned an error."
-        return f"SuperOffice MCP tool '{tool_name}' returned an error."
+        return f"Knowledge MCP tool '{tool_name}' returned an error."
 
     async def _execute_tool_call(
         self,
@@ -110,74 +113,88 @@ class SuperOfficeMcpClientAdapter(SuperOfficeServicePort):
 
                 if tool_result.isError:
                     error_msg = self._extract_error_message(tool_result, tool_name)
-                    raise SuperOfficeIntegrationError(
+                    if "not configured" in error_msg.lower():
+                        raise KnowledgeBackendNotConfiguredError(error_msg)
+                    raise KnowledgeSearchError(
                         f"Downstream {tool_name} failed: {error_msg}",
-                        error_code="DOWNSTREAM_SUPEROFFICE_ERROR",
+                        error_code="DOWNSTREAM_KNOWLEDGE_ERROR",
                     )
 
                 return self._extract_payload(tool_result)
 
         except (httpx.TimeoutException, TimeoutError) as exc:
             logger.warning(
-                "SuperOffice MCP tool timed out",
+                "Knowledge MCP tool call timed out",
                 tool=tool_name,
                 endpoint=endpoint_url,
                 error=str(exc),
             )
-            raise SuperOfficeIntegrationError(
-                f"SuperOffice MCP server timed out during {tool_name}.",
+            raise KnowledgeSearchError(
+                f"Knowledge MCP server timed out during {tool_name}.",
                 error_code="DOWNSTREAM_TIMEOUT",
             ) from exc
         except httpx.HTTPStatusError as exc:
             logger.warning(
-                "SuperOffice MCP server returned HTTP error status",
+                "Knowledge MCP server returned HTTP error status",
                 status_code=exc.response.status_code,
                 endpoint=endpoint_url,
             )
-            raise SuperOfficeIntegrationError(
-                f"SuperOffice MCP server returned HTTP status {exc.response.status_code}.",
+            raise KnowledgeSearchError(
+                f"Knowledge MCP server returned HTTP status {exc.response.status_code}.",
                 error_code="DOWNSTREAM_UNAVAILABLE",
             ) from exc
-        except SuperOfficeIntegrationError:
+        except (KnowledgeSearchError, KnowledgeBackendNotConfiguredError):
             raise
         except Exception as exc:
-            if "ValidationError" in type(exc).__name__:
-                raise
             logger.error(
-                "SuperOffice MCP communication failed",
+                "Knowledge MCP communication failed",
                 tool=tool_name,
                 endpoint=endpoint_url,
                 error=str(exc),
             )
-            raise SuperOfficeIntegrationError(
-                f"Failed to communicate with SuperOffice MCP server: {exc}",
+            raise KnowledgeSearchError(
+                f"Failed to communicate with Knowledge MCP server: {exc}",
                 error_code="DOWNSTREAM_UNAVAILABLE",
             ) from exc
         finally:
             if owns_client:
                 await client_to_use.aclose()
 
-    async def get_ticket(
+    async def search_knowledge(
         self,
-        ticket_id: int,
-    ) -> MinimizedTicketDetailDTO:
-        """Retrieve sanitized ticket detail via downstream SuperOffice MCP server."""
-        raw_payload = await self._execute_tool_call(TOOL_NAME_GET_TICKET, {"ticket_id": ticket_id})
-        return MinimizedTicketDetailDTO.model_validate(raw_payload)
+        criteria: KnowledgeSearchCriteriaDTO,
+    ) -> Sequence[KnowledgeSearchResultDomainDTO]:
+        args: dict[str, Any] = {
+            "query_text": criteria.query_text,
+            "max_results": criteria.limit,
+        }
+        raw_payload = await self._execute_tool_call(TOOL_NAME_SEARCH_KNOWLEDGE, args)
+        if isinstance(raw_payload, list):
+            return [KnowledgeSearchResultDomainDTO.model_validate(item) for item in raw_payload]
+        return []
 
-    async def get_ticket_audit_trail(
+    async def find_known_issues(
         self,
-        ticket_id: int,
-        include_field_changes: bool = True,
-        limit: int = 50,
-    ) -> TicketAuditTrailDTO:
-        """Retrieve chronological ticket audit trail via downstream SuperOffice MCP server."""
-        raw_payload = await self._execute_tool_call(
-            TOOL_NAME_GET_TICKET_AUDIT_TRAIL,
-            {
-                "ticket_id": ticket_id,
-                "include_field_changes": include_field_changes,
-                "limit": limit,
-            },
-        )
-        return TicketAuditTrailDTO.model_validate(raw_payload)
+        criteria: KnownIssueSearchCriteriaDTO,
+    ) -> Sequence[KnownIssueDomainDTO]:
+        args: dict[str, Any] = {
+            "query_text": criteria.query_text or "",
+            "max_results": criteria.limit,
+        }
+        raw_payload = await self._execute_tool_call(TOOL_NAME_FIND_KNOWN_ISSUES, args)
+        if isinstance(raw_payload, list):
+            return [KnownIssueDomainDTO.model_validate(item) for item in raw_payload]
+        return []
+
+    async def get_runbook(
+        self,
+        runbook_id: str,
+    ) -> RunbookDetailDomainDTO | None:
+        args: dict[str, Any] = {"runbook_id": runbook_id}
+        try:
+            raw_payload = await self._execute_tool_call(TOOL_NAME_GET_RUNBOOK, args)
+            if isinstance(raw_payload, dict) and raw_payload:
+                return RunbookDetailDomainDTO.model_validate(raw_payload)
+            return None
+        except Exception:
+            return None

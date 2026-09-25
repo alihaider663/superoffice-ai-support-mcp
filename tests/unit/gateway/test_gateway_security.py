@@ -247,9 +247,13 @@ def test_composite_capability_guard_a_dynamic_discovery() -> None:
     actual_capabilities = _discover_adapter_tool_constants()
     assert actual_capabilities == {
         "get_ticket",
+        "get_ticket_audit_trail",
         "get_database_health",
         "find_slow_queries",
         "find_deadlocks",
+        "get_ticket_diagnostic_record",
+        "find_blocking_sessions",
+        "search_logs",
     }
 
 

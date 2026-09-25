@@ -506,7 +506,7 @@ async def test_investigate_incident_output_schema_closed_typed() -> None:
     assert output_schema.get("title") == "InvestigateIncidentResponseDTO"
     assert output_schema.get("additionalProperties") is False
     props = output_schema.get("properties", {})
-    assert set(props.keys()) == {"source_outcomes", "evidence"}
+    assert set(props.keys()) == {"source_outcomes", "evidence", "hypothesis_evaluation"}
 
     defs = output_schema.get("$defs", {})
     assert "InvestigationSourceOutcomeWireDTO" in defs
@@ -515,6 +515,13 @@ async def test_investigate_incident_output_schema_closed_typed() -> None:
     assert "DatabaseHealthObservationDTO" in defs
     assert "DeadlockObservationDTO" in defs
     assert "SlowQueryObservationDTO" in defs
+    assert "TicketAuditObservationDTO" in defs
+    assert "TicketDiagnosticObservationDTO" in defs
+    assert "BlockingSessionObservationDTO" in defs
+    assert "LogExcerptObservationDTO" in defs
+    assert "KnownIssueObservationDTO" in defs
+    assert "KnowledgeArticleObservationDTO" in defs
+    assert "HypothesisEvaluationWireDTO" in defs
 
 
 @pytest.mark.unit

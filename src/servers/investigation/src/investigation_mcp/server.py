@@ -16,6 +16,7 @@ from starlette.applications import Starlette
 from starlette.routing import Route
 
 from investigation_mcp.adapters.diagnostics_mcp_adapter import DiagnosticsMcpClientAdapter
+from investigation_mcp.adapters.knowledge_mcp_adapter import KnowledgeMcpClientAdapter
 from investigation_mcp.adapters.superoffice_mcp_adapter import SuperOfficeMcpClientAdapter
 from investigation_mcp.contracts.dtos import (
     InvestigateIncidentRequestDTO,
@@ -28,8 +29,14 @@ from investigation_mcp.contracts.mappers import (
 )
 from investigation_mcp.settings import InvestigationServerSettings
 from platform_investigation import IncidentCorrelationEngine, InvestigationOrchestratorEngine
+from platform_investigation.evaluator import HypothesisEvaluatorEngine
 from platform_investigation.store import InMemoryInvestigationStore
-from platform_investigation_service.ports import DiagnosticsServicePort, SuperOfficeServicePort
+from platform_investigation_service.ports import (
+    DiagnosticsServicePort,
+    KnowledgeServicePort,
+    LogsServicePort,
+    SuperOfficeServicePort,
+)
 from platform_investigation_service.service import InvestigationApplicationService
 from platform_observability.logging import get_logger
 
@@ -52,10 +59,11 @@ ALLOWED_BACKEND_HOSTS = [
 
 TOOL_DESCRIPTION_INVESTIGATE_INCIDENT = (
     "Investigate support incidents by gathering read-only diagnostic evidence from "
-    "available SuperOffice CRM and database diagnostic sources. Returns structured findings "
-    "and source availability status. Requested sources may be unavailable, blocked, or "
-    "unconfigured. The tool does not modify records, maintain durable investigation sessions, "
-    "or determine a root cause."
+    "SuperOffice CRM, MSSQL database diagnostics, application logs, and the knowledge base. "
+    "Correlates events chronologically, evaluates working hypotheses against findings, "
+    "and returns structured findings and source availability status. Requested sources "
+    "may be unavailable, blocked, or unconfigured. The tool does not modify records, "
+    "maintain durable investigation sessions, or perform automated state mutations."
 )
 
 
@@ -97,12 +105,14 @@ class InvestigationMcpServer(Server):
     Performs safe application-controlled validation with zero caller-input echoing.
     """
 
-    def __init__(
+    def __init__(  # noqa: PLR0917
         self,
         service: InvestigationApplicationService | None = None,
         settings: InvestigationServerSettings | None = None,
         superoffice_service: SuperOfficeServicePort | None = None,
         diagnostics_service: DiagnosticsServicePort | None = None,
+        knowledge_service: KnowledgeServicePort | None = None,
+        logs_service: LogsServicePort | None = None,
     ) -> None:
         super().__init__("investigation-mcp-server")
         self.app_settings = settings or InvestigationServerSettings()
@@ -110,6 +120,8 @@ class InvestigationMcpServer(Server):
         self._service = service
         self._superoffice_service = superoffice_service
         self._diagnostics_service = diagnostics_service
+        self._knowledge_service = knowledge_service
+        self._logs_service = logs_service
 
         self._tools: list[Tool] = [
             Tool(
@@ -172,14 +184,26 @@ class InvestigationMcpServer(Server):
                 diag_port = self._diagnostics_service or DiagnosticsMcpClientAdapter(
                     base_url=str(self.app_settings.diagnostics_mcp_url)
                 )
+                kb_port = self._knowledge_service or (
+                    KnowledgeMcpClientAdapter(base_url=str(self.app_settings.knowledge_mcp_url))
+                    if self.app_settings.knowledge_mcp_url is not None
+                    else None
+                )
+                logs_port = self._logs_service or (
+                    diag_port if isinstance(diag_port, LogsServicePort) else None
+                )
                 req_store = InMemoryInvestigationStore()
                 req_orchestrator = InvestigationOrchestratorEngine(store=req_store)
                 req_correlator = IncidentCorrelationEngine()
+                req_evaluator = HypothesisEvaluatorEngine()
                 req_service = InvestigationApplicationService(
                     orchestrator=req_orchestrator,
                     superoffice_service=so_port,
                     diagnostics_service=diag_port,
+                    knowledge_service=kb_port,
+                    logs_service=logs_port,
                     correlator=req_correlator,
+                    evaluator=req_evaluator,
                 )
                 internal_result = await req_service.investigate(internal_request)
 
@@ -212,6 +236,7 @@ class InvestigationMcpServer(Server):
             "Investigation tool completed successfully",
             outcome_count=len(public_response.source_outcomes),
             evidence_count=len(public_response.evidence),
+            has_evaluation=public_response.hypothesis_evaluation is not None,
         )
         response_dict = public_response.model_dump(mode="json")
         return CallToolResult(
@@ -261,11 +286,13 @@ class InvestigationMcpServer(Server):
         )
 
 
-def create_investigation_mcp_server(
+def create_investigation_mcp_server(  # noqa: PLR0917
     service: InvestigationApplicationService | None = None,
     settings: InvestigationServerSettings | None = None,
     superoffice_service: SuperOfficeServicePort | None = None,
     diagnostics_service: DiagnosticsServicePort | None = None,
+    knowledge_service: KnowledgeServicePort | None = None,
+    logs_service: LogsServicePort | None = None,
 ) -> InvestigationMcpServer:
     """Instantiate and configure the official low-level MCP Investigation server.
 
@@ -277,14 +304,18 @@ def create_investigation_mcp_server(
         settings=settings,
         superoffice_service=superoffice_service,
         diagnostics_service=diagnostics_service,
+        knowledge_service=knowledge_service,
+        logs_service=logs_service,
     )
 
 
-def create_app(
+def create_app(  # noqa: PLR0917
     settings: InvestigationServerSettings | None = None,
     service: InvestigationApplicationService | None = None,
     superoffice_service: SuperOfficeServicePort | None = None,
     diagnostics_service: DiagnosticsServicePort | None = None,
+    knowledge_service: KnowledgeServicePort | None = None,
+    logs_service: LogsServicePort | None = None,
 ) -> Starlette:
     """Create the Starlette ASGI application for Investigation MCP Server."""
     server = create_investigation_mcp_server(
@@ -292,5 +323,7 @@ def create_app(
         settings=settings,
         superoffice_service=superoffice_service,
         diagnostics_service=diagnostics_service,
+        knowledge_service=knowledge_service,
+        logs_service=logs_service,
     )
     return server.streamable_http_app()

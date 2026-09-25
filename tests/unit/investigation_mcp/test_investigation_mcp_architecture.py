@@ -5,8 +5,13 @@ from pathlib import Path
 import pytest
 
 from investigation_mcp.adapters.diagnostics_mcp_adapter import DiagnosticsMcpClientAdapter
+from investigation_mcp.adapters.knowledge_mcp_adapter import KnowledgeMcpClientAdapter
 from investigation_mcp.adapters.superoffice_mcp_adapter import SuperOfficeMcpClientAdapter
-from platform_investigation_service.ports import DiagnosticsServicePort, SuperOfficeServicePort
+from platform_investigation_service.ports import (
+    DiagnosticsServicePort,
+    KnowledgeServicePort,
+    SuperOfficeServicePort,
+)
 
 
 @pytest.mark.unit
@@ -54,6 +59,7 @@ def test_adapters_satisfy_domain_ports():
     """Verify that MCP client adapters satisfy Layer-4 runtime-checkable protocols."""
     assert issubclass(SuperOfficeMcpClientAdapter, SuperOfficeServicePort)
     assert issubclass(DiagnosticsMcpClientAdapter, DiagnosticsServicePort)
+    assert issubclass(KnowledgeMcpClientAdapter, KnowledgeServicePort)
 
 
 @pytest.mark.unit
@@ -61,7 +67,12 @@ def test_adapters_expose_no_generic_dispatch_methods():
     """Verify that adapters expose only port methods and no arbitrary tool dispatch method."""
     forbidden_methods = ["call_tool", "execute_tool", "dispatch_tool", "run_tool"]
 
-    for cls in [SuperOfficeMcpClientAdapter, DiagnosticsMcpClientAdapter]:
+    adapter_classes = [
+        SuperOfficeMcpClientAdapter,
+        DiagnosticsMcpClientAdapter,
+        KnowledgeMcpClientAdapter,
+    ]
+    for cls in adapter_classes:
         public_methods = [
             m for m in dir(cls) if not m.startswith("_") and callable(getattr(cls, m))
         ]
@@ -72,12 +83,11 @@ def test_adapters_expose_no_generic_dispatch_methods():
 
 
 @pytest.mark.unit
-def test_no_knowledge_or_infrastructure_mcp_client_in_investigation():
-    """Verify no Knowledge or Infrastructure MCP client exists in investigation_mcp."""
+def test_no_infrastructure_mcp_client_in_investigation():
+    """Verify no Infrastructure MCP client exists in investigation_mcp."""
     inv_dir = Path("src/servers/investigation/src/investigation_mcp")
     for py_file in inv_dir.rglob("*.py"):
         content = py_file.read_text(encoding="utf-8")
-        assert "kb_mcp" not in content, f"Forbidden Knowledge reference in {py_file}"
         assert "infra_mcp" not in content, f"Forbidden Infrastructure reference in {py_file}"
 
 

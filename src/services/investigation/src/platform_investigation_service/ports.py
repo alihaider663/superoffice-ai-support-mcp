@@ -2,11 +2,11 @@
 
 These protocols define the contract-only surface that the Layer-4 orchestration
 service and concrete collectors depend on. They are satisfied by domain
-Application Services from the server packages (so_mcp, diag_mcp) and the Layer-3
+Application Services from the server packages (so_mcp, diag_mcp, kb_mcp) and the Layer-3
 investigation engine (InvestigationOrchestratorEngine) via structural subtyping.
 
 Import policy: ONLY platform-investigation, platform-core, so_mcp.contracts.*,
-and diag_mcp.contracts.* DTO/criteria contracts are permitted.
+diag_mcp.contracts.*, and kb_mcp.contracts.* DTO/criteria contracts are permitted.
 NO server runtime, adapter, or infrastructure imports are allowed.
 """
 
@@ -14,17 +14,29 @@ from collections.abc import Sequence
 from typing import Protocol, runtime_checkable
 
 from diag_mcp.contracts.dtos import (
+    BlockingSessionCriteriaDTO,
+    BlockingSessionDomainDTO,
     BoundedDiagnosticResultDTO,
     DatabaseHealthDomainDTO,
     DeadlockCriteriaDTO,
     DeadlockDomainDTO,
+    SanitizedLogExcerptDTO,
     SlowQueryCriteriaDTO,
     SlowQueryDomainDTO,
+    TicketDiagnosticRecordDomainDTO,
+)
+from kb_mcp.contracts.dtos import (
+    KnowledgeSearchCriteriaDTO,
+    KnowledgeSearchResultDomainDTO,
+    KnownIssueDomainDTO,
+    KnownIssueSearchCriteriaDTO,
+    RunbookDetailDomainDTO,
 )
 from platform_investigation.models import (
     Hypothesis,
     InvestigationPlan,
 )
+from so_mcp.audit.contracts import TicketAuditTrailDTO
 from so_mcp.contracts.dtos import MinimizedTicketDetailDTO
 
 
@@ -60,10 +72,9 @@ class InvestigationOrchestratorPort(Protocol):
 
 @runtime_checkable
 class SuperOfficeServicePort(Protocol):
-    """Narrow contract for SuperOffice CRM ticket retrieval.
+    """Narrow contract for SuperOffice CRM ticket and audit retrieval.
 
-    Satisfied by SuperOfficeApplicationService from so_mcp.
-    Only the get_ticket operation is consumed during investigation collection.
+    Satisfied by SuperOfficeApplicationService and TicketAuditService from so_mcp.
     """
 
     async def get_ticket(
@@ -73,13 +84,21 @@ class SuperOfficeServicePort(Protocol):
         """Retrieve sanitized ticket detail with purpose-based field selection."""
         ...
 
+    async def get_ticket_audit_trail(
+        self,
+        ticket_id: int,
+        include_field_changes: bool = True,
+        limit: int = 50,
+    ) -> TicketAuditTrailDTO:
+        """Retrieve chronological ticket audit trail and field mutation history."""
+        ...
+
 
 @runtime_checkable
 class DiagnosticsServicePort(Protocol):
     """Narrow contract for MSSQL database diagnostics.
 
     Satisfied by DiagnosticsApplicationService from diag_mcp.
-    Only baseline selected read-only operations are included.
     """
 
     async def get_database_health(self) -> DatabaseHealthDomainDTO:
@@ -98,4 +117,68 @@ class DiagnosticsServicePort(Protocol):
         criteria: SlowQueryCriteriaDTO,
     ) -> BoundedDiagnosticResultDTO[SlowQueryDomainDTO]:
         """Find slow queries with bounded results and sanitized summary text."""
+        ...
+
+    async def get_ticket_diagnostic_record(
+        self,
+        ticket_id: int,
+    ) -> TicketDiagnosticRecordDomainDTO | None:
+        """Fetch database-level diagnostic record for a ticket."""
+        ...
+
+    async def find_blocking_sessions(
+        self,
+        criteria: BlockingSessionCriteriaDTO | None = None,
+    ) -> BoundedDiagnosticResultDTO[BlockingSessionDomainDTO]:
+        """Fetch active blocking session snapshot."""
+        ...
+
+    async def search_logs(
+        self,
+        query: str,
+        limit: int = 20,
+    ) -> BoundedDiagnosticResultDTO[SanitizedLogExcerptDTO]:
+        """Search sanitized application and API logs."""
+        ...
+
+
+@runtime_checkable
+class LogsServicePort(Protocol):
+    """Narrow contract for application and API log retrieval."""
+
+    async def search_logs(
+        self,
+        query: str,
+        limit: int = 20,
+    ) -> BoundedDiagnosticResultDTO[SanitizedLogExcerptDTO]:
+        """Search sanitized application log entries."""
+        ...
+
+
+@runtime_checkable
+class KnowledgeServicePort(Protocol):
+    """Narrow contract for Knowledge Base search and runbook retrieval.
+
+    Satisfied by KnowledgeApplicationService from kb_mcp.
+    """
+
+    async def search_knowledge(
+        self,
+        criteria: KnowledgeSearchCriteriaDTO,
+    ) -> Sequence[KnowledgeSearchResultDomainDTO]:
+        """Semantic search for knowledge articles and runbook excerpts."""
+        ...
+
+    async def find_known_issues(
+        self,
+        criteria: KnownIssueSearchCriteriaDTO,
+    ) -> Sequence[KnownIssueDomainDTO]:
+        """Find matching known issues and verified workarounds."""
+        ...
+
+    async def get_runbook(
+        self,
+        runbook_id: str,
+    ) -> RunbookDetailDomainDTO | None:
+        """Retrieve operational runbook details by ID."""
         ...

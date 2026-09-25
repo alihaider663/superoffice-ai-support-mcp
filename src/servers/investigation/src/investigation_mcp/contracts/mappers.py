@@ -2,23 +2,34 @@
 
 import uuid
 from datetime import UTC
+from typing import Any
 
 from diag_mcp.contracts.dtos import DeadlockCriteriaDTO, SlowQueryCriteriaDTO
 from investigation_mcp.contracts.dtos import (
+    BlockingSessionObservationDTO,
     DatabaseHealthObservationDTO,
     DeadlockInvestigationInputDTO,
     DeadlockObservationDTO,
     DiagnosticEvidenceWireDTO,
+    HypothesisEvaluationWireDTO,
     InvestigateIncidentRequestDTO,
     InvestigateIncidentResponseDTO,
     InvestigationDiagnosticsInputDTO,
+    InvestigationKnowledgeInputDTO,
+    InvestigationLogsInputDTO,
     InvestigationSourceOutcomeWireDTO,
+    InvestigationSuperOfficeInputDTO,
+    KnowledgeArticleObservationDTO,
+    KnownIssueObservationDTO,
+    LogExcerptObservationDTO,
     PublicEvidenceSource,
     PublicSourceErrorCode,
     PublicSourceStatus,
     PublicSourceType,
     SlowQueryInvestigationInputDTO,
     SlowQueryObservationDTO,
+    TicketAuditObservationDTO,
+    TicketDiagnosticObservationDTO,
     TicketObservationDTO,
 )
 from investigation_mcp.contracts.errors import (
@@ -36,6 +47,9 @@ from platform_investigation_service.models import (
     DiagnosticsSelectionDTO,
     InvestigationRequest,
     InvestigationResult,
+    KnowledgeSelectionDTO,
+    LogsSelectionDTO,
+    SuperOfficeSelectionDTO,
 )
 
 # Canonical source-outcome error mapping table:
@@ -48,6 +62,10 @@ ERROR_CODE_MAP: dict[str, tuple[PublicSourceErrorCode, str]] = {
     "KNOWLEDGE_BASE_NOT_CONFIGURED": (
         "KNOWLEDGE_BASE_NOT_CONFIGURED",
         "Knowledge base source is not configured.",
+    ),
+    "KNOWLEDGE_BASE_RETRIEVAL_FAILED": (
+        "SOURCE_EXECUTION_FAILED",
+        "Knowledge base source data could not be retrieved.",
     ),
     "SUPEROFFICE_SERVICE_UNAVAILABLE": (
         "SUPEROFFICE_UNAVAILABLE",
@@ -96,13 +114,56 @@ class InvestigationRequestMapper:
         diagnostics_selection = InvestigationRequestMapper._map_diagnostics_selection(
             public_dto.diagnostics
         )
+        so_selection = InvestigationRequestMapper._map_so_selection(public_dto.superoffice)
+        knowledge_selection = InvestigationRequestMapper._map_knowledge_selection(
+            public_dto.knowledge
+        )
+        logs_selection = InvestigationRequestMapper._map_logs_selection(public_dto.logs)
 
         return InvestigationRequest(
             correlation_key=correlation_key,
             initial_hypothesis=public_dto.initial_hypothesis,
             ticket_id=public_dto.ticket_id,
+            so_selection=so_selection,
             diagnostics_selection=diagnostics_selection,
+            knowledge_selection=knowledge_selection,
+            logs_selection=logs_selection,
             max_steps=None,
+        )
+
+    @staticmethod
+    def _map_so_selection(
+        dto: InvestigationSuperOfficeInputDTO | None,
+    ) -> SuperOfficeSelectionDTO | None:
+        if dto is None:
+            return None
+        return SuperOfficeSelectionDTO(
+            include_audit_trail=dto.include_audit_trail,
+            audit_trail_limit=dto.audit_trail_limit,
+        )
+
+    @staticmethod
+    def _map_knowledge_selection(
+        dto: InvestigationKnowledgeInputDTO | None,
+    ) -> KnowledgeSelectionDTO | None:
+        if dto is None:
+            return None
+        return KnowledgeSelectionDTO(
+            include_knowledge_search=dto.include_knowledge_search,
+            query_override=dto.query_override,
+            limit=dto.limit,
+        )
+
+    @staticmethod
+    def _map_logs_selection(
+        dto: InvestigationLogsInputDTO | None,
+    ) -> LogsSelectionDTO | None:
+        if dto is None:
+            return None
+        return LogsSelectionDTO(
+            include_logs=dto.include_logs,
+            query=dto.query,
+            limit=dto.limit,
         )
 
     @staticmethod
@@ -128,6 +189,8 @@ class InvestigationRequestMapper:
             include_database_health=diagnostics.include_database_health,
             deadlock_criteria=deadlock_criteria,
             slow_query_criteria=slow_query_criteria,
+            include_ticket_diagnostic=diagnostics.include_ticket_diagnostic,
+            include_blocking_sessions=diagnostics.include_blocking_sessions,
         )
 
     @staticmethod
@@ -164,9 +227,18 @@ class InvestigationResponseMapper:
             result.aggregation.evidence
         )
 
+        # 3. Map hypothesis evaluation if present
+        public_evaluation = None
+        if result.hypothesis_evaluation is not None:
+            public_evaluation = HypothesisEvaluationWireDTO(
+                hypothesis_id=result.hypothesis_evaluation.hypothesis_id,
+                outcome=result.hypothesis_evaluation.outcome.value.upper(),
+            )
+
         return InvestigateIncidentResponseDTO(
             source_outcomes=public_outcomes,
             evidence=public_evidence,
+            hypothesis_evaluation=public_evaluation,
         )
 
     @staticmethod
@@ -184,10 +256,9 @@ class InvestigationResponseMapper:
                 error_message=None,
             )
 
-        # For non-success, map to approved public code and fixed safe message
         if outcome.error_code not in ERROR_CODE_MAP:
             raise InvalidSourceErrorCodeError(
-                "Encountered unmapped internal source outcome error code"
+                f"Encountered unmapped internal source outcome error code: {outcome.error_code}"
             )
 
         public_error_code, public_error_message = ERROR_CODE_MAP[outcome.error_code]
@@ -205,16 +276,12 @@ class InvestigationResponseMapper:
         mapped_items: list[DiagnosticEvidenceWireDTO] = []
 
         for evidence in raw_evidence:
-            # Step 1: Validate timestamp awareness (fail closed on naive)
             if evidence.timestamp.tzinfo is None:
                 raise InvalidEvidenceTimestampError(
                     "Internal diagnostic evidence contains an offset-naive timestamp"
                 )
 
-            # Step 2: Normalize to UTC
             utc_timestamp = evidence.timestamp.astimezone(UTC)
-
-            # Step 3: Exact discriminator matching on source_type and tags
             public_source, observation_dto = InvestigationResponseMapper._map_observation(evidence)
 
             mapped_items.append(
@@ -225,21 +292,13 @@ class InvestigationResponseMapper:
                 )
             )
 
-        # Step 4: Python stable sort on normalized UTC timestamp
         mapped_items.sort(key=lambda item: item.timestamp)
-
         return tuple(mapped_items)
 
     @staticmethod
-    def _map_observation(
+    def _map_observation(  # noqa: PLR0911
         evidence: DiagnosticEvidence,
-    ) -> tuple[
-        PublicEvidenceSource,
-        TicketObservationDTO
-        | DatabaseHealthObservationDTO
-        | DeadlockObservationDTO
-        | SlowQueryObservationDTO,
-    ]:
+    ) -> tuple[PublicEvidenceSource, Any]:
         data = evidence.data
 
         # 1. SuperOffice ticket
@@ -259,7 +318,24 @@ class InvestigationResponseMapper:
             )
             return "superoffice_crm", ticket_dto
 
-        # 2. Database health
+        # 2. SuperOffice ticket audit action
+        if evidence.source_type == EvidenceSourceType.SUPEROFFICE_CRM and evidence.tags == (
+            "crm",
+            "ticket",
+            "audit_trail",
+        ):
+            audit_dto = TicketAuditObservationDTO(
+                action_id=data["action_id"],
+                ticket_id=data["ticket_id"],
+                action_code=data.get("action_code"),
+                action_name=data["action_name"],
+                description=data.get("description", ""),
+                actor=data.get("actor"),
+                field_changes=data.get("field_changes", []),
+            )
+            return "superoffice_crm", audit_dto
+
+        # 3. Database health
         if evidence.source_type == EvidenceSourceType.MSSQL_DIAGNOSTICS and evidence.tags == (
             "diagnostics",
             "database",
@@ -272,7 +348,7 @@ class InvestigationResponseMapper:
             )
             return "mssql_diagnostics", health_dto
 
-        # 3. Deadlock
+        # 4. Deadlock
         if evidence.source_type == EvidenceSourceType.MSSQL_DIAGNOSTICS and evidence.tags == (
             "diagnostics",
             "database",
@@ -285,7 +361,7 @@ class InvestigationResponseMapper:
             )
             return "mssql_diagnostics", deadlock_dto
 
-        # 4. Slow query
+        # 5. Slow query
         if evidence.source_type == EvidenceSourceType.MSSQL_DIAGNOSTICS and evidence.tags == (
             "diagnostics",
             "database",
@@ -300,7 +376,83 @@ class InvestigationResponseMapper:
             )
             return "mssql_diagnostics", slow_query_dto
 
+        # 6. Ticket diagnostic record (y_logticket)
+        if evidence.source_type == EvidenceSourceType.MSSQL_DIAGNOSTICS and evidence.tags == (
+            "diagnostics",
+            "database",
+            "ticket_diagnostic",
+        ):
+            td_dto = TicketDiagnosticObservationDTO(
+                ticket_id=data["ticket_id"],
+                has_db_activity=data["has_db_activity"],
+                recent_error_count=data["recent_error_count"],
+                last_activity_time=data.get("last_activity_time"),
+                diagnostic_summary=data["diagnostic_summary"],
+            )
+            return "mssql_diagnostics", td_dto
+
+        # 7. Blocking session
+        if evidence.source_type == EvidenceSourceType.MSSQL_DIAGNOSTICS and evidence.tags == (
+            "diagnostics",
+            "database",
+            "blocking_session",
+        ):
+            bs_dto = BlockingSessionObservationDTO(
+                blocking_session_id=data["blocking_session_id"],
+                blocked_session_id=data["blocked_session_id"],
+                wait_duration_ms=data["wait_duration_ms"],
+                wait_type=data.get("wait_type", ""),
+            )
+            return "mssql_diagnostics", bs_dto
+
+        # 8. Log excerpt
+        if evidence.source_type == EvidenceSourceType.APPLICATION_LOGS and evidence.tags == (
+            "diagnostics",
+            "logs",
+            "excerpt",
+        ):
+            log_dto = LogExcerptObservationDTO(
+                excerpt_id=data["excerpt_id"],
+                service_name=data["service_name"],
+                severity=data["severity"],
+                sanitized_message=data["sanitized_message"],
+                correlation_id=data.get("correlation_id"),
+            )
+            return "application_logs", log_dto
+
+        # 9. Knowledge known issue
+        if evidence.source_type == EvidenceSourceType.KNOWLEDGE_BASE and evidence.tags == (
+            "knowledge",
+            "known_issue",
+        ):
+            ki_dto = KnownIssueObservationDTO(
+                issue_id=data["issue_id"],
+                title=data["title"],
+                symptom_summary=data["symptom_summary"],
+                root_cause_summary=data["root_cause_summary"],
+                workaround=data.get("workaround"),
+                permanent_fix_reference=data.get("permanent_fix_reference"),
+                affected_products=data.get("affected_products", []),
+            )
+            return "knowledge_base", ki_dto
+
+        # 10. Knowledge article
+        if evidence.source_type == EvidenceSourceType.KNOWLEDGE_BASE and evidence.tags == (
+            "knowledge",
+            "article",
+        ):
+            ka_dto = KnowledgeArticleObservationDTO(
+                document_id=data["document_id"],
+                title=data["title"],
+                content_excerpt=data["content_excerpt"],
+                category=data["category"],
+                relevance_score=data["relevance_score"],
+                source_reference=data["source_reference"],
+            )
+            return "knowledge_base", ka_dto
+
         # Any mismatch, extra tags, missing tags, or unknown source fails closed
         raise InvalidEvidenceObservationError(
-            "Evidence observation discriminator failed exact tag and source matching"
+            f"Evidence observation discriminator failed exact tag and source matching: "
+            f"source={evidence.source_type}, tags={evidence.tags}"
         )

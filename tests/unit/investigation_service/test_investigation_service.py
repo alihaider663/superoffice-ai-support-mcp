@@ -320,8 +320,8 @@ class TestInvestigationApplicationService:
         assert result.plan.max_steps == 7
 
     @pytest.mark.asyncio
-    async def test_no_hypothesis_evaluation_in_phase_3_5(self) -> None:
-        """InvestigationResult contains no hypothesis evaluation fields."""
+    async def test_hypothesis_evaluation_in_phase_6(self) -> None:
+        """InvestigationResult contains hypothesis evaluation in Phase 6."""
         service = _build_service()
         request = InvestigationRequest(
             correlation_key="key",
@@ -330,8 +330,7 @@ class TestInvestigationApplicationService:
 
         result = await service.investigate(request)
 
-        assert not hasattr(result, "hypothesis_evaluation")
-        assert not hasattr(result, "evaluation")
+        assert hasattr(result, "hypothesis_evaluation")
 
     def test_request_validation_rejects_leading_trailing_whitespace(self) -> None:
         with pytest.raises(ValidationError):

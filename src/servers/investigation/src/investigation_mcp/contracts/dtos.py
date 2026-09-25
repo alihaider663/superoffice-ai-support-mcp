@@ -1,7 +1,7 @@
 """Public wire contracts and DTOs for the Investigation MCP Server."""
 
 from datetime import UTC, datetime
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import ConfigDict, Field, field_validator, model_validator
 
@@ -23,7 +23,7 @@ class DeadlockInvestigationInputDTO(PlatformBaseModel):
         default=10,
         ge=1,
         le=50,
-        description="Maximum deadlock events to return (1..50, default 10, capped by D02)",
+        description="Maximum deadlock events to return (1..50, default 10)",
     )
 
     @field_validator("start_time", "end_time", mode="after")
@@ -66,7 +66,7 @@ class SlowQueryInvestigationInputDTO(PlatformBaseModel):
         default=10,
         ge=1,
         le=50,
-        description="Maximum slow queries to return (1..50, default 10, capped by D02)",
+        description="Maximum slow queries to return (1..50, default 10)",
     )
 
     @field_validator("start_time", "end_time", mode="after")
@@ -104,6 +104,69 @@ class InvestigationDiagnosticsInputDTO(PlatformBaseModel):
         default=None,
         description="Explicit opt-in criteria to search slow executing database queries",
     )
+    include_ticket_diagnostic: bool = Field(
+        default=False,
+        description="Explicit opt-in to inspect ticket database diagnostic record (y_logticket)",
+    )
+    include_blocking_sessions: bool = Field(
+        default=False,
+        description="Explicit opt-in to inspect active blocking sessions snapshot",
+    )
+
+
+class InvestigationSuperOfficeInputDTO(PlatformBaseModel):
+    """Public criteria for SuperOffice CRM evidence collection."""
+
+    include_audit_trail: bool = Field(
+        default=False,
+        description="Explicit opt-in to retrieve ticket change history and audit trail",
+    )
+    audit_trail_limit: int = Field(
+        default=20,
+        ge=1,
+        le=100,
+        description="Maximum audit trail events to retrieve",
+    )
+
+
+class InvestigationKnowledgeInputDTO(PlatformBaseModel):
+    """Public criteria for Knowledge Base search."""
+
+    include_knowledge_search: bool = Field(
+        default=True,
+        description="Whether to search knowledge base for matching known issues and runbooks",
+    )
+    query_override: str | None = Field(
+        default=None,
+        max_length=256,
+        description="Optional custom query for knowledge search (defaults to hypothesis/ticket)",
+    )
+    limit: int = Field(
+        default=5,
+        ge=1,
+        le=20,
+        description="Maximum knowledge items to retrieve",
+    )
+
+
+class InvestigationLogsInputDTO(PlatformBaseModel):
+    """Public criteria for Application Logs search."""
+
+    include_logs: bool = Field(
+        default=False,
+        description="Explicit opt-in to search application logs",
+    )
+    query: str | None = Field(
+        default=None,
+        max_length=256,
+        description="Query text for log search",
+    )
+    limit: int = Field(
+        default=20,
+        ge=1,
+        le=50,
+        description="Maximum log excerpts to retrieve",
+    )
 
 
 class InvestigateIncidentRequestDTO(PlatformBaseModel):
@@ -128,9 +191,21 @@ class InvestigateIncidentRequestDTO(PlatformBaseModel):
         ge=1,
         description="Optional SuperOffice ticket ID to collect CRM ticket context",
     )
+    superoffice: InvestigationSuperOfficeInputDTO | None = Field(
+        default=None,
+        description="Optional SuperOffice CRM collection criteria (e.g. audit trail)",
+    )
     diagnostics: InvestigationDiagnosticsInputDTO | None = Field(
         default=None,
         description="Optional database diagnostic checks to execute",
+    )
+    knowledge: InvestigationKnowledgeInputDTO | None = Field(
+        default=None,
+        description="Optional knowledge base search options",
+    )
+    logs: InvestigationLogsInputDTO | None = Field(
+        default=None,
+        description="Optional application logs search options",
     )
 
     @field_validator("initial_hypothesis", mode="after")
@@ -147,11 +222,15 @@ class InvestigateIncidentRequestDTO(PlatformBaseModel):
             self.diagnostics.include_database_health
             or self.diagnostics.deadlocks is not None
             or self.diagnostics.slow_queries is not None
+            or self.diagnostics.include_ticket_diagnostic
+            or self.diagnostics.include_blocking_sessions
         )
-        if not (has_ticket or has_diag):
+        has_kb = self.knowledge is not None and self.knowledge.include_knowledge_search
+        has_logs = self.logs is not None and self.logs.include_logs
+        if not (has_ticket or has_diag or has_kb or has_logs):
             raise ValueError(
                 "At least one investigation target or diagnostic check must be specified: "
-                "provide 'ticket_id' and/or configure 'diagnostics'."
+                "provide 'ticket_id' and/or configure 'diagnostics', 'knowledge', or 'logs'."
             )
         return self
 
@@ -177,6 +256,25 @@ class TicketObservationDTO(PlatformBaseModel):
     sanitized_customer_reference: str | None = Field(
         default=None,
         description="Sanitized customer reference identifier",
+    )
+
+
+class TicketAuditObservationDTO(PlatformBaseModel):
+    """SuperOffice CRM ticket audit trail action observation."""
+
+    observation_type: Literal["ticket_audit"] = "ticket_audit"
+    action_id: int = Field(..., description="Unique action identifier")
+    ticket_id: int = Field(..., description="SuperOffice ticket identifier")
+    action_code: int | None = Field(default=None, description="SuperOffice action code")
+    action_name: str = Field(..., description="Descriptive action title")
+    description: str = Field(default="", description="Action description")
+    actor: str | None = Field(
+        default=None,
+        description="Actor login name or user ID representation",
+    )
+    field_changes: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="Granular field mutations associated with this action",
     )
 
 
@@ -211,15 +309,87 @@ class SlowQueryObservationDTO(PlatformBaseModel):
     execution_count: int = Field(..., description="Number of executions recorded")
 
 
+class TicketDiagnosticObservationDTO(PlatformBaseModel):
+    """MSSQL ticket database diagnostic activity observation."""
+
+    observation_type: Literal["ticket_diagnostic"] = "ticket_diagnostic"
+    ticket_id: int = Field(..., description="SuperOffice ticket identifier")
+    has_db_activity: bool = Field(..., description="Whether ticket has DB diagnostic activity")
+    recent_error_count: int = Field(..., description="Count of recent errors matching ticket")
+    last_activity_time: datetime | None = Field(
+        default=None, description="Timestamp of latest DB activity"
+    )
+    diagnostic_summary: str = Field(..., description="Database diagnostic summary")
+
+
+class BlockingSessionObservationDTO(PlatformBaseModel):
+    """MSSQL active blocking session observation."""
+
+    observation_type: Literal["blocking_session"] = "blocking_session"
+    blocking_session_id: int = Field(..., description="Head blocking session ID")
+    blocked_session_id: int = Field(..., description="Blocked session ID")
+    wait_duration_ms: int = Field(..., description="Wait duration in milliseconds")
+    wait_type: str = Field(default="", description="MSSQL wait resource/type")
+
+
+class LogExcerptObservationDTO(PlatformBaseModel):
+    """Sanitized application or API log excerpt observation."""
+
+    observation_type: Literal["log_excerpt"] = "log_excerpt"
+    excerpt_id: str = Field(..., description="Unique log excerpt identifier")
+    service_name: str = Field(..., description="Originating service name")
+    severity: str = Field(..., description="Log severity")
+    sanitized_message: str = Field(..., description="Sanitized log message")
+    correlation_id: str | None = Field(default=None, description="Request correlation identifier")
+
+
+class KnownIssueObservationDTO(PlatformBaseModel):
+    """Knowledge base verified known issue observation."""
+
+    observation_type: Literal["known_issue"] = "known_issue"
+    issue_id: str = Field(..., description="Known issue identifier")
+    title: str = Field(..., description="Known issue summary title")
+    symptom_summary: str = Field(..., description="Observable symptoms")
+    root_cause_summary: str = Field(..., description="Root cause explanation")
+    workaround: str | None = Field(default=None, description="Recommended workaround")
+    permanent_fix_reference: str | None = Field(
+        default=None, description="Fix reference or hotfix ID"
+    )
+    affected_products: list[str] = Field(default_factory=list, description="Affected products")
+
+
+class KnowledgeArticleObservationDTO(PlatformBaseModel):
+    """Knowledge base article or runbook documentation observation."""
+
+    observation_type: Literal["knowledge_article"] = "knowledge_article"
+    document_id: str = Field(..., description="Document identifier")
+    title: str = Field(..., description="Article title")
+    content_excerpt: str = Field(..., description="Excerpt content")
+    category: str = Field(..., description="Article category")
+    relevance_score: float = Field(..., description="Relevance score")
+    source_reference: str = Field(..., description="Source reference")
+
+
 DiagnosticObservationUnion = Annotated[
     TicketObservationDTO
+    | TicketAuditObservationDTO
     | DatabaseHealthObservationDTO
     | DeadlockObservationDTO
-    | SlowQueryObservationDTO,
+    | SlowQueryObservationDTO
+    | TicketDiagnosticObservationDTO
+    | BlockingSessionObservationDTO
+    | LogExcerptObservationDTO
+    | KnownIssueObservationDTO
+    | KnowledgeArticleObservationDTO,
     Field(discriminator="observation_type"),
 ]
 
-PublicEvidenceSource = Literal["superoffice_crm", "mssql_diagnostics"]
+PublicEvidenceSource = Literal[
+    "superoffice_crm",
+    "mssql_diagnostics",
+    "application_logs",
+    "knowledge_base",
+]
 
 
 class DiagnosticEvidenceWireDTO(PlatformBaseModel):
@@ -288,6 +458,15 @@ class InvestigationSourceOutcomeWireDTO(PlatformBaseModel):
         return self
 
 
+class HypothesisEvaluationWireDTO(PlatformBaseModel):
+    """Grounded evaluation outcome for an incident hypothesis."""
+
+    hypothesis_id: str = Field(..., description="Target hypothesis identifier")
+    outcome: Literal["SUPPORTED", "REFUTED", "INCONCLUSIVE", "UNEVALUATED"] = Field(
+        ..., description="Deterministic evaluation outcome"
+    )
+
+
 class InvestigateIncidentResponseDTO(PlatformBaseModel):
     """Immutable public wire contract for incident investigation results."""
 
@@ -298,4 +477,8 @@ class InvestigateIncidentResponseDTO(PlatformBaseModel):
     evidence: tuple[DiagnosticEvidenceWireDTO, ...] = Field(
         default=(),
         description="Chronologically ordered diagnostic evidence items observed across sources",
+    )
+    hypothesis_evaluation: HypothesisEvaluationWireDTO | None = Field(
+        default=None,
+        description="Deterministic evaluation outcome of the incident hypothesis",
     )
