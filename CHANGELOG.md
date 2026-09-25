@@ -10,6 +10,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Phase B — Pre-Flight Health-Check Engine & Visual Connectivity Dashboard** (`platform_core.preflight`):
+  - Comprehensive asynchronous diagnostic engine evaluating platform dependencies concurrently (`asyncio.gather`):
+    - SuperOffice IIS Cluster: TCP reachability + HTTP GET status and IIS server detection, with hard tenant isolation checks (flags `osl-so-iis1.ls.local` violations).
+    - MSSQL Telemetry: TCP 1433 reachability, authenticated `SELECT @@SERVERNAME, DB_NAME()` query, and tenant database name matching.
+    - PostgreSQL Knowledge Base: TCP 5432 reachability, `pgvector` extension verification, and schema table counts.
+    - SuperOffice Codebase Mirror: Filesystem path existence, structure, file count, and `manifest.json` verification.
+    - Network Ports: Probes standard microservice ports (8000, 8001, 8002, 8003, 8005) to check availability or detect active running instances.
+    - Security Perimeter: Evaluates JWT secret length (min 32 chars), placeholder detection, PII redaction, and attachment killswitch.
+  - Terminal CLI runner (`uv run python -m platform_core.preflight`) with ANSI status badges, latency measurements, and exit codes.
+  - Responsive visual web dashboard (`uv run python -m platform_core.preflight --gui` or `scripts/preflight-gui.ps1`) powered by Starlette and Uvicorn on `http://127.0.0.1:8088` with auto-browser launch and interactive re-run button.
+  - PowerShell one-click runners: `scripts/check-preflight.ps1` and `scripts/preflight-gui.ps1`.
 - **Phase A — Configuration Decomposition & Multi-Node Cluster Node Settings**:
   - Decomposed `KNOWLEDGE_DATABASE_URL` into discrete parameters (`KNOWLEDGE_DATABASE_HOST`, `PORT`, `NAME`, `USER`, `PASSWORD`, `SCHEMA`).
   - Automatic URL encoding via `quote_plus()` in `KnowledgeServerSettings.get_async_database_url()` to safely handle special characters (e.g. `@` in passwords).
@@ -45,7 +56,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Clarified tool descriptions for `search_logs` and `get_ticket_diagnostic_record` to actively prevent AI retry loops when backends are unconfigured or awaiting DBA schema verification.
   - Investigation service aggregator updated with diagnostic context enrichment.
 - **Regression Test Suite**:
-  - Expanded test baseline from 1,118 to **1,180 passing tests** (12 skipped opt-in live DB tests, 0 failures).
+  - Expanded test baseline from 1,118 to **1,189 passing tests** (12 skipped opt-in live DB tests, 0 failures).
 - Repository professionalization and provider-neutral hygiene updates (FLC.5B).
 - Configuration-driven upstream endpoint detection in pre-flight development tooling.
 

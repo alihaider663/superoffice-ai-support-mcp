@@ -136,4 +136,6 @@ if ($sqlHost) {
 Write-Host ""
 Write-Host "==========================================================" -ForegroundColor Cyan
 Write-Host " Pre-Flight Check Completed." -ForegroundColor Cyan
+Write-Host " Tip: Run .\scripts\check-preflight.ps1 for deep async connectivity probes" -ForegroundColor DarkCyan
+Write-Host "      or .\scripts\preflight-gui.ps1 for the visual dashboard." -ForegroundColor DarkCyan
 Write-Host "==========================================================" -ForegroundColor Cyan
