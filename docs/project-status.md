@@ -58,6 +58,8 @@ The **SuperOffice AI Support MCP Platform** is an enterprise-grade AI-assisted d
 | **FLC.3** | Decision Ledger, Deferred Items & Documentation Reconciliation | `COMPLETE / APPROVED / CHECKPOINTED` |
 | **FLC.4** | Local Development Release 1.0 Checkpoint & Tag | `COMPLETE / APPROVED` |
 | **FLC.5** | Repository Professionalization & Remote Publication | `NOT STARTED` |
+| **Phase 7** | Controlled Two-Way Script Deployment & Safe Mutations | `PENDING / DEFERRED` (Preserving strict 100% `READ_ONLY` posture) |
+| **Phase A** | Configuration Decomposition & Multi-Node Cluster Isolation | `COMPLETE / APPROVED` |
 | **PR.0–PR.12** | Production Readiness Program | `FUTURE / NOT STARTED` |
 
 ---
@@ -592,8 +594,8 @@ Following the completion of Local Development Release 1.0, the project will prog
 The local platform has been comprehensively verified and validated across all unit, integration, and security test suites:
 
 - **Full Platform Regression Suite**:
-  - **Passed**: `1142` tests (expanded across Phase 1, Phase 2, and Phase 3)
-  - **Skipped**: `11` tests (opt-in live database mutation tests guarded by environment variables)
+  - **Passed**: `1180` tests (expanded across Phase 1, Phase 2, Phase 3, and Phase A)
+  - **Skipped**: `12` tests (opt-in live database mutation tests guarded by environment variables)
   - **Failed**: `0`
 - **Focused Security & Contract Suite (FLC.2)**:
   - **Passed**: `396` tests (100% pass rate)

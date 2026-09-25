@@ -6,6 +6,7 @@ import asyncio
 import os
 from logging.config import fileConfig
 from typing import TYPE_CHECKING
+from urllib.parse import quote_plus
 
 from alembic import context
 from sqlalchemy import pool
@@ -26,12 +27,26 @@ target_metadata = None
 
 
 def get_database_url() -> str:
-    """Retrieve the Knowledge database URL from environment.
+    """Retrieve the Knowledge database URL from environment or discrete settings.
 
     Never commits or hardcodes credentials.
     """
     url = os.getenv("KNOWLEDGE_DATABASE_URL")
     if not url:
+        host = os.getenv("KNOWLEDGE_DATABASE_HOST")
+        name = os.getenv("KNOWLEDGE_DATABASE_NAME")
+        user = os.getenv("KNOWLEDGE_DATABASE_USER")
+        if host and name and user:
+            password = os.getenv("KNOWLEDGE_DATABASE_PASSWORD", "")
+            port = os.getenv("KNOWLEDGE_DATABASE_PORT", "5432")
+            auth = (
+                f"{quote_plus(user)}:{quote_plus(password)}@"
+                if password
+                else f"{quote_plus(user)}@"
+            )
+            port_str = f":{port}" if port else ""
+            return f"postgresql+asyncpg://{auth}{host}{port_str}/{name}"
+
         raise RuntimeError(
             "KNOWLEDGE_DATABASE_URL environment variable is not set. "
             "Migration execution requires a valid connection string to 'superoffice_ai_knowledge'."

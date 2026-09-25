@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Phase A — Configuration Decomposition & Multi-Node Cluster Node Settings**:
+  - Decomposed `KNOWLEDGE_DATABASE_URL` into discrete parameters (`KNOWLEDGE_DATABASE_HOST`, `PORT`, `NAME`, `USER`, `PASSWORD`, `SCHEMA`).
+  - Automatic URL encoding via `quote_plus()` in `KnowledgeServerSettings.get_async_database_url()` to safely handle special characters (e.g. `@` in passwords).
+  - Multi-node SuperOffice app server configuration via `SUPEROFFICE_APP_SERVERS` and `app_server_node_urls` property on `SuperOfficeServerSettings`.
+  - Added unit test suites `test_decomposed_settings.py` and `test_app_servers_settings.py`.
 - **SuperOffice Codebase Mirror & Synchronization Engine** (`so_mcp.sync`):
   - Dual extraction pipelines supporting authenticated HTTP (`scripts/customer.fcgi`) and direct read-only MSSQL queries.
   - Automated extraction of CRMScript / EJScript custom scripts, screen definitions, extra custom tables (`y_`), and configuration tables.
@@ -27,6 +32,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Executive presentation deck (`SuperOffice_AI_Support_MCP_Client_Deck.pptx`) for stakeholder alignment and architectural walkthroughs.
 
 ### Changed
+- **Tenant Isolation Enforcement**:
+  - Enforced strict tenant cluster isolation for `SUPEROFFICE_APP_SERVERS`. Active environment explicitly excludes `osl-so-iis1.ls.local` because it connects to an alternate database on host `10.6.20.32`.
+- **Exhaustive Environment Configuration Synchronization**:
+  - Fully populated `.env` and `.env.example` across all 5 MCP servers and Gateway with commented-out optional path overrides to avoid Pydantic path coercion bugs.
+- **Phase 7 — Controlled Two-Way Script Deployment & Safe Mutations**:
+  - **PENDING / DEFERRED**: Formally postponed to maintain a strictly 100% `READ_ONLY` operational baseline, preventing unintended mutations or risk to tenant systems.
 - **Architectural Boundary Enforcement**:
   - Enforced zero cross-server imports between `so_mcp` and `diag_mcp`, ensuring full fault-domain isolation verified by architectural contract tests.
 - **Diagnostics & Investigation Enhancements**:
@@ -34,10 +45,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Clarified tool descriptions for `search_logs` and `get_ticket_diagnostic_record` to actively prevent AI retry loops when backends are unconfigured or awaiting DBA schema verification.
   - Investigation service aggregator updated with diagnostic context enrichment.
 - **Regression Test Suite**:
-  - Expanded test baseline from 1,043 to **1,118 passing tests** (11 skipped opt-in live DB tests, 0 failures).
+  - Expanded test baseline from 1,118 to **1,180 passing tests** (12 skipped opt-in live DB tests, 0 failures).
 - Repository professionalization and provider-neutral hygiene updates (FLC.5B).
 - Configuration-driven upstream endpoint detection in pre-flight development tooling.
-- Environment template expansion with complete MCP component defaults.
 
 ---
 

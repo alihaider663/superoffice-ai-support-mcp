@@ -43,6 +43,20 @@ class SuperOfficeServerSettings(BasePlatformSettings):
         default=False,
         description="Allow self-signed TLS certificates",
     )
+    app_servers: str | None = Field(
+        default=None,
+        description=(
+            "Comma-separated list of active SuperOffice IIS app server URLs for this tenant "
+            "(e.g. 'https://osl-so-iis2.ls.local/SuperOffice')."
+        ),
+    )
+
+    @property
+    def app_server_node_urls(self) -> list[str]:
+        """Return list of verified SuperOffice app server node URLs."""
+        if not self.app_servers:
+            return [str(self.api_url).rstrip("/")]
+        return [node.strip().rstrip("/") for node in self.app_servers.split(",") if node.strip()]
 
     security: SecuritySettings = SecuritySettings()
     logging: LoggingSettings = LoggingSettings()

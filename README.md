@@ -3,7 +3,7 @@
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
 [![MCP Official SDK](https://img.shields.io/badge/MCP-Official%20SDK-orange.svg)](https://modelcontextprotocol.io/)
 [![Status](https://img.shields.io/badge/Status-Local%20Development%20Release%201.0-brightgreen.svg)]()
-[![Regression Tests](https://img.shields.io/badge/Tests-1153%20Passed-success.svg)]()
+[![Regression Tests](https://img.shields.io/badge/Tests-1180%20Passed-success.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 An enterprise-grade, secure, modular Model Context Protocol (MCP) platform for AI-assisted SuperOffice CRM support triage, diagnostic telemetry, and cross-system incident investigation.
@@ -241,7 +241,7 @@ The platform includes an automated synchronization engine (`so_mcp.sync`) that m
 The codebase maintains a 100% verified baseline with zero lint or type errors:
 
 ```bash
-# Run full regression suite (1118 passed, 11 skipped live-DB tests)
+# Run full regression suite (1180 passed, 12 skipped live-DB tests)
 uv run pytest
 
 # Linting and style verification
